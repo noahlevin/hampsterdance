@@ -1,0 +1,356 @@
+/* ============================================
+   HAMPSTER DANCE AI
+   Aesthetic: 1999 GeoCities meets 2026 AI
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #FFFFFF;
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive, sans-serif;
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><text y="24" font-size="24">🐹</text></svg>'), auto;
+    overflow-x: hidden;
+}
+
+#page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 10px;
+}
+
+/* Title */
+.title {
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+    font-size: 36px;
+    color: #FF6600;
+    text-shadow: 2px 2px #FFCC00;
+    padding: 10px 0;
+}
+
+/* Counter bar */
+#counter-bar {
+    background: linear-gradient(to right, #3366CC, #6699FF, #3366CC);
+    color: #FFFFFF;
+    text-align: center;
+    padding: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    border: 2px solid #000066;
+    margin: 5px 0;
+}
+
+.counter-value {
+    font-size: 20px;
+    color: #FFFF00;
+}
+
+/* The Dance Floor */
+#dance-floor {
+    background-color: #FFFFCC;
+    border: 3px dashed #FF6600;
+    min-height: 300px;
+    padding: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    gap: 0;
+    position: relative;
+    margin: 10px 0;
+}
+
+/* Individual hamster tile */
+.hamster-tile {
+    width: 120px;
+    text-align: center;
+    padding: 5px;
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.hamster-tile img {
+    width: 80px;
+    height: auto;
+    image-rendering: pixelated;
+}
+
+.hamster-tile .hamster-name {
+    font-size: 11px;
+    font-weight: bold;
+    color: #333;
+    margin-top: 2px;
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Speech bubble */
+.speech-bubble {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #FFFFFF;
+    border: 2px solid #000;
+    border-radius: 10px;
+    padding: 3px 8px;
+    font-size: 10px;
+    white-space: nowrap;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    z-index: 10;
+    animation: bubble-fade 8s forwards;
+}
+
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #000;
+}
+
+@keyframes bubble-fade {
+    0% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Dance animations */
+.dance-default img {
+    animation: dance-bounce 0.5s infinite alternate;
+}
+
+.dance-fast img {
+    animation: dance-bounce 0.2s infinite alternate;
+}
+
+.dance-slow img {
+    animation: dance-bounce 1.2s infinite alternate;
+}
+
+.dance-spin img {
+    animation: dance-spin 1s infinite linear;
+}
+
+.dance-moonwalk img {
+    animation: dance-moonwalk 2s infinite alternate;
+}
+
+.dance-headbang img {
+    animation: dance-headbang 0.3s infinite;
+}
+
+@keyframes dance-bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-8px); }
+}
+
+@keyframes dance-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes dance-moonwalk {
+    from { transform: translateX(-10px) scaleX(-1); }
+    to { transform: translateX(10px) scaleX(-1); }
+}
+
+@keyframes dance-headbang {
+    0% { transform: rotate(0deg); }
+    50% { transform: rotate(-15deg); }
+    100% { transform: rotate(0deg); }
+}
+
+/* Activity Feed */
+#activity-feed {
+    background: #000;
+    border: 2px solid #333;
+    margin: 10px 0;
+    max-height: 200px;
+    overflow: hidden;
+}
+
+.feed-header {
+    background: #CC0000;
+    color: #FFFFFF;
+    font-weight: bold;
+    font-size: 14px;
+    padding: 5px 10px;
+    text-align: center;
+    letter-spacing: 2px;
+}
+
+.feed-icon {
+    width: 20px;
+    height: 20px;
+    vertical-align: middle;
+}
+
+#feed-entries {
+    padding: 5px;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.feed-entry {
+    color: #00FF00;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 2px 5px;
+    border-bottom: 1px solid #222;
+}
+
+.feed-entry:last-child {
+    border-bottom: none;
+}
+
+.feed-time {
+    color: #666;
+    font-size: 10px;
+}
+
+/* Rainbow HR */
+.rainbow-hr {
+    border: none;
+    height: 5px;
+    background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);
+    margin: 15px 0;
+}
+
+/* Join section */
+#join-section {
+    text-align: center;
+    padding: 15px;
+    background: #EEEEFF;
+    border: 2px solid #9999CC;
+}
+
+#join-section h2 {
+    color: #CC0000;
+    font-size: 22px;
+    margin-bottom: 10px;
+}
+
+#join-section p {
+    font-size: 14px;
+    margin: 5px 0;
+}
+
+.code-block {
+    background: #1a1a2e;
+    color: #00FF00;
+    border: 2px solid #333;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 10px auto;
+    max-width: 500px;
+    text-align: left;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    overflow-x: auto;
+}
+
+.code-block pre {
+    white-space: pre;
+}
+
+/* Footer */
+#footer {
+    text-align: center;
+    padding: 10px;
+    font-size: 12px;
+    color: #666;
+}
+
+#footer marquee {
+    color: #FF6600;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.construction-gif {
+    width: 40px;
+    height: auto;
+    vertical-align: middle;
+}
+
+/* Play prompt overlay */
+#play-prompt {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    cursor: pointer;
+}
+
+#play-prompt.hidden {
+    display: none;
+}
+
+.play-prompt-inner {
+    text-align: center;
+    color: #FFFFFF;
+    font-size: 24px;
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+}
+
+.play-prompt-inner small {
+    color: #FFCC00;
+    font-size: 16px;
+}
+
+.play-icon {
+    width: 100px;
+    height: auto;
+    margin-bottom: 10px;
+}
+
+/* Poke flash effect */
+.poke-flash {
+    animation: poke-flash 0.5s ease-out;
+}
+
+@keyframes poke-flash {
+    0% { filter: brightness(1); }
+    25% { filter: brightness(2) hue-rotate(90deg); }
+    50% { filter: brightness(1); }
+    75% { filter: brightness(2) hue-rotate(180deg); }
+    100% { filter: brightness(1); }
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+    font-size: 16px;
+    width: 100%;
+}
+
+.empty-state img {
+    width: 60px;
+    opacity: 0.5;
+    margin-bottom: 10px;
+}

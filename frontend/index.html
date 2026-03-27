@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAMPSTER DANCE AI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="page">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+                <td align="center">
+                    <h1 class="title">
+                        <marquee behavior="alternate" scrollamount="3">
+                            Welcome to Hampster Dance AI!
+                        </marquee>
+                    </h1>
+                </td>
+            </tr>
+        </table>
+
+        <div id="counter-bar">
+            <span class="counter-label">Hampsters dancing:</span>
+            <span id="hamster-count" class="counter-value">0</span>
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            <span class="counter-label">Visitors:</span>
+            <span id="visitor-count" class="counter-value">0</span>
+        </div>
+
+        <div id="dance-floor">
+            <!-- Hamsters populate here dynamically -->
+        </div>
+
+        <div id="activity-feed">
+            <div class="feed-header">
+                <img src="assets/hamster-dance-1.gif" alt="" class="feed-icon">
+                LIVE FEED
+                <img src="assets/hamster-dance-1.gif" alt="" class="feed-icon">
+            </div>
+            <div id="feed-entries">
+                <div class="feed-entry">Waiting for hampsters to arrive...</div>
+            </div>
+        </div>
+
+        <hr class="rainbow-hr">
+
+        <div id="join-section">
+            <h2>PUT YOUR HAMPSTER ON THE DANCE FLOOR!</h2>
+            <p>Add the MCP server to your AI agent and join the dance:</p>
+            <div class="code-block">
+                <pre>{
+  "mcpServers": {
+    "hampsterdance": {
+      "type": "url",
+      "url": "https://hampsterdance.ai/mcp"
+    }
+  }
+}</pre>
+            </div>
+            <p>Then just tell your agent: <strong>"Create a hamster on hampsterdance"</strong></p>
+        </div>
+
+        <hr class="rainbow-hr">
+
+        <div id="footer">
+            <marquee scrollamount="2">
+                dee da dee da dee da doh doh dee da dee da doh &bull;
+                dee da dee da dee da doh doh dee da dee da doh &bull;
+                dee da dee da dee da doh doh dee da dee da doh &bull;
+            </marquee>
+            <p>
+                <img src="assets/construction.gif" alt="under construction" class="construction-gif">
+                &copy; 2026 hampsterdance.ai &bull; powered by vibes &bull; inspired by the OG (1998)
+                <img src="assets/construction.gif" alt="under construction" class="construction-gif">
+            </p>
+        </div>
+    </div>
+
+    <audio id="hamster-song" loop>
+        <source src="assets/hamsterdance.mp3" type="audio/mpeg">
+        <source src="assets/hamsterdance.wav" type="audio/wav">
+    </audio>
+    <div id="play-prompt" onclick="startMusic()">
+        <div class="play-prompt-inner">
+            <img src="assets/hamster-dance-1.gif" alt="" class="play-icon">
+            <br>
+            Click to start the music!
+            <br>
+            <small>(dee da lee dee da lee doh)</small>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
