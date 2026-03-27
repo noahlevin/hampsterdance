@@ -270,8 +270,9 @@ body {
     color: #00FF00;
     font-family: 'Courier New', monospace;
     font-size: 11px;
-    padding: 2px 5px;
+    padding: 2px 5px 2px 45px;
     border-bottom: 1px solid #222;
+    text-indent: -40px;
 }
 
 .feed-entry:last-child {
@@ -1659,5 +1660,355 @@ body {
 
     .notepad-content {
         font-size: 11px;
+    }
+}
+
+/* ============================================
+   BEEF ZONE (Diss Battles)
+   ============================================ */
+
+#beef-zone {
+    margin: 10px 0;
+    border: 3px solid #CC0000;
+    background: #1a1a1a;
+}
+
+.beef-header {
+    background: linear-gradient(to right, #CC0000, #FF3300, #CC0000);
+    color: #FFFFFF;
+    font-weight: bold;
+    font-size: 16px;
+    padding: 8px 10px;
+    text-align: center;
+    letter-spacing: 3px;
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+    text-shadow: 2px 2px #000;
+}
+
+.beef-icon {
+    font-size: 18px;
+}
+
+.battle-card {
+    border: 2px solid #333;
+    margin: 8px;
+    background: #222;
+}
+
+.battle-vs {
+    display: flex;
+    align-items: stretch;
+}
+
+.battle-side {
+    flex: 1;
+    text-align: center;
+    padding: 10px 5px;
+}
+
+.battle-side.winning {
+    background: rgba(255, 215, 0, 0.15);
+    border: 1px solid #FFD700;
+}
+
+.battle-hamster-gif {
+    width: 60px;
+    height: auto;
+    image-rendering: pixelated;
+}
+
+.battle-name {
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+    font-size: 13px;
+    font-weight: bold;
+    color: #FF6600;
+    margin: 4px 0;
+}
+
+.battle-diss {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: #00FF00;
+    padding: 4px 8px;
+    background: #111;
+    border: 1px solid #333;
+    margin: 4px;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.battle-diss em {
+    color: #666;
+}
+
+.battle-cheers {
+    font-size: 14px;
+    color: #FFFF00;
+    cursor: pointer;
+    padding: 4px;
+    margin-top: 4px;
+    background: #333;
+    border: 1px outset #555;
+    display: inline-block;
+}
+
+.battle-cheers:hover {
+    background: #444;
+}
+
+.battle-cheers:active {
+    border-style: inset;
+}
+
+.battle-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+    font-size: 24px;
+    font-weight: bold;
+    color: #FF0000;
+    text-shadow: 2px 2px #000;
+    padding: 0 8px;
+    background: #111;
+    min-width: 50px;
+}
+
+.battle-status {
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: #999;
+    padding: 4px;
+    background: #111;
+    border-top: 1px solid #333;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ============================================
+   CONGA LINE
+   ============================================ */
+
+#conga-section {
+    margin: 10px 0;
+    border: 3px solid #FF6600;
+    background: linear-gradient(to right, #FFCC00, #FF9900, #FFCC00);
+    overflow: hidden;
+}
+
+.conga-header {
+    text-align: center;
+    padding: 6px;
+}
+
+.conga-banner {
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+    font-size: 18px;
+    font-weight: bold;
+    color: #CC0000;
+    text-shadow: 1px 1px #FFFF00;
+    letter-spacing: 2px;
+}
+
+#conga-track {
+    overflow: hidden;
+    padding: 10px 0;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+#conga-line {
+    display: flex;
+    gap: 5px;
+    animation: conga-scroll 10s linear infinite;
+    width: max-content;
+}
+
+@keyframes conga-scroll {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+}
+
+.conga-hamster {
+    text-align: center;
+    width: 80px;
+    flex-shrink: 0;
+    animation: conga-bounce 0.4s infinite alternate;
+}
+
+.conga-hamster img {
+    width: 60px;
+    height: auto;
+    image-rendering: pixelated;
+}
+
+.conga-name {
+    font-size: 9px;
+    font-weight: bold;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@keyframes conga-bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-6px); }
+}
+
+/* ============================================
+   CUDDLE PUDDLE
+   ============================================ */
+
+#cuddle-puddle {
+    margin: 10px 0;
+    border: 3px solid #6666AA;
+    background: linear-gradient(135deg, #2a2040, #3a3060, #2a2040);
+    padding: 10px;
+    text-align: center;
+}
+
+.cuddle-header {
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+    font-size: 18px;
+    font-weight: bold;
+    color: #AAAAEE;
+    text-shadow: 1px 1px #000;
+    margin-bottom: 4px;
+}
+
+.cuddle-msg {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: #8888BB;
+    margin-bottom: 8px;
+}
+
+#cuddle-hamsters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-end;
+    min-height: 80px;
+}
+
+.cuddle-hamster {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    animation: cuddle-rock 3s ease-in-out infinite alternate;
+}
+
+.cuddle-hamster img {
+    width: 55px;
+    height: auto;
+    image-rendering: pixelated;
+    filter: grayscale(30%) brightness(0.8);
+    opacity: 0.85;
+}
+
+.cuddle-name {
+    font-size: 8px;
+    color: #8888BB;
+    white-space: nowrap;
+}
+
+.zzz {
+    position: absolute;
+    top: -8px;
+    right: -2px;
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+    font-size: 12px;
+    color: #AAAAFF;
+    animation: zzz-float 2s ease-in-out infinite;
+    opacity: 0.8;
+}
+
+@keyframes cuddle-rock {
+    from { transform: rotate(-3deg); }
+    to { transform: rotate(3deg); }
+}
+
+@keyframes zzz-float {
+    0% { transform: translateY(0) scale(0.8); opacity: 0.4; }
+    50% { transform: translateY(-8px) scale(1.2); opacity: 1; }
+    100% { transform: translateY(-2px) scale(0.8); opacity: 0.4; }
+}
+
+/* ============================================
+   HOROSCOPES
+   ============================================ */
+
+#horoscope-section {
+    margin: 10px 0;
+    border: 3px solid #6633AA;
+    background: linear-gradient(135deg, #1a0a2e, #2a1a3e, #1a0a2e);
+}
+
+.horoscope-header {
+    background: linear-gradient(to right, #6633AA, #9944DD, #6633AA);
+    color: #FFFFFF;
+    font-weight: bold;
+    font-size: 16px;
+    padding: 8px 10px;
+    text-align: center;
+    letter-spacing: 3px;
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+    text-shadow: 1px 1px #000;
+}
+
+#horoscope-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    padding: 10px;
+}
+
+.horoscope-card {
+    background: rgba(100, 50, 170, 0.2);
+    border: 1px solid #6633AA;
+    padding: 8px;
+    text-align: center;
+}
+
+.horoscope-sign {
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive;
+    font-size: 14px;
+    font-weight: bold;
+    color: #DDAAFF;
+    margin-bottom: 4px;
+}
+
+.horoscope-text {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: #CCAAEE;
+    line-height: 1.4;
+}
+
+/* ============================================
+   MOBILE — New Features
+   ============================================ */
+
+@media (max-width: 768px) {
+    .battle-vs {
+        flex-direction: column;
+    }
+
+    .battle-divider {
+        padding: 4px;
+        font-size: 18px;
+        min-width: auto;
+    }
+
+    #horoscope-list {
+        grid-template-columns: 1fr;
+    }
+
+    .conga-banner {
+        font-size: 14px;
     }
 }
