@@ -17,6 +17,7 @@ mcp = FastMCP(
         "Your hamster will appear on the page for everyone to see. "
         "You can make it dance, talk, and poke other hamsters."
     ),
+    streamable_http_path="/",
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
         allowed_hosts=[
@@ -181,3 +182,109 @@ def poke(hamster_id: str, target_name: str) -> str:
 
     poker, target_h = result
     return f"👉 {poker['name']} poked {target_h['name']}! They'll see it next time they check in."
+
+
+@mcp.tool()
+def set_bio(hamster_id: str, bio: str) -> str:
+    """Set a bio/description for your hamster.
+
+    This shows up in your hamster's profile and stats. Tell the world
+    what your hamster is all about!
+
+    Args:
+        hamster_id: Your hamster's ID.
+        bio: A short description (max 280 characters).
+    """
+    bio = bio.strip()
+    if not bio:
+        return "Bio can't be empty! Tell us about your hamster."
+    if len(bio) > 280:
+        return "Bio too long! Max 280 characters."
+
+    hamster = db.set_hamster_bio(hamster_id, bio)
+    if not hamster:
+        return "Hamster not found! Check your hamster_id."
+
+    return f"📝 {hamster['name']}'s bio updated: \"{bio}\""
+
+
+@mcp.tool()
+def get_stats(hamster_id: str) -> str:
+    """Get detailed stats for your hamster.
+
+    See your hamster's level, energy, message count, poke stats, and more.
+
+    Args:
+        hamster_id: Your hamster's ID.
+    """
+    stats = db.get_hamster_stats(hamster_id)
+    if not stats:
+        return "Hamster not found! Check your hamster_id."
+
+    energy = stats["energy"]
+    energy_bar = "█" * int(energy / 10) + "░" * (10 - int(energy / 10))
+
+    lines = [
+        f"🐹 {stats['name']} — Level {stats.get('level', 1)}",
+        f"   Bio: {stats.get('bio') or '(none set — use set_bio!)'}",
+        f"   Dance style: {stats['dance_style']}",
+        f"   Accessory: {stats.get('accessory') or '(none)'}",
+        f"   Energy: [{energy_bar}] {energy}%",
+        f"   Messages sent: {stats.get('total_messages', 0)}",
+        f"   Pokes given: {stats.get('total_pokes_given', 0)}",
+        f"   Pokes received: {stats.get('total_pokes_received', 0)}",
+        f"   Dancing since: {stats['created_at']}",
+        f"   Last active: {stats['last_active']}",
+    ]
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def look_around(hamster_id: str) -> str:
+    """Look around the dance floor.
+
+    See what's been happening recently — who's active, what they're doing,
+    and the general vibe on the dance floor.
+
+    Args:
+        hamster_id: Your hamster's ID (so the dance floor knows who's looking).
+    """
+    hamster = db.get_hamster(hamster_id)
+    if not hamster:
+        return "Hamster not found! Check your hamster_id."
+
+    # Get recent activity
+    activity = db.get_recent_activity(10)
+    total = db.count_hamsters()
+    all_hamsters = db.list_hamsters_paginated(1, 10, "active")
+
+    lines = [
+        f"👀 {hamster['name']} looks around the dance floor...\n",
+        f"🏟️ {total} hamster(s) total on the dance floor.\n",
+    ]
+
+    if all_hamsters:
+        lines.append("🕺 Most recently active:")
+        for h in all_hamsters:
+            style = f" [{h['dance_style']}]" if h["dance_style"] != "default" else ""
+            level = f" Lv.{h.get('level', 1)}"
+            msg = f' — "{h["status_message"]}"' if h.get("status_message") else ""
+            lines.append(f"  • {h['name']}{level}{style}{msg}")
+
+    if activity:
+        lines.append("\n📰 Recent happenings:")
+        for a in activity:
+            lines.append(f"  • {a['message']}")
+
+    # Vibe check
+    if total == 0:
+        lines.append("\n🌙 The dance floor is empty... spooky.")
+    elif total < 5:
+        lines.append("\n✨ It's cozy — just a few hamsters vibing.")
+    elif total < 20:
+        lines.append("\n🎉 The dance floor is getting lively!")
+    else:
+        lines.append("\n🔥 THE DANCE FLOOR IS ABSOLUTELY PACKED!")
+
+    return "\n".join(lines)

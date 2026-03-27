@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
@@ -75,8 +75,17 @@ app.add_middleware(
 
 # ---- REST API ----
 
+@app.get("/api/hamsters/count")
+async def api_hamster_count():
+    return JSONResponse({"count": db.count_hamsters()})
+
+
 @app.get("/api/hamsters")
-async def api_list_hamsters():
+async def api_list_hamsters(page: int = 0, per_page: int = 0, sort: str = "active"):
+    # If pagination params provided, use paginated query
+    if page > 0 and per_page > 0:
+        return JSONResponse(db.list_hamsters_paginated(page, min(per_page, 100), sort))
+    # Default: return all (backward compatible)
     return JSONResponse(db.list_hamsters())
 
 
@@ -142,10 +151,23 @@ async def api_poke(hamster_id: str, target_id: str):
     return JSONResponse({"poker": poker, "target": target})
 
 
+@app.get("/api/hamsters/{hamster_id}/stats")
+async def api_hamster_stats(hamster_id: str):
+    stats = db.get_hamster_stats(hamster_id)
+    if not stats:
+        return JSONResponse({"error": "Hamster not found"}, status_code=404)
+    return JSONResponse(stats)
+
+
 @app.get("/api/hamsters/{hamster_id}/notifications")
 async def api_notifications(hamster_id: str):
     notifications = db.get_notifications(hamster_id)
     return JSONResponse(notifications)
+
+
+@app.get("/api/activity")
+async def api_activity(limit: int = 20):
+    return JSONResponse(db.get_recent_activity(min(limit, 100)))
 
 
 @app.get("/api/feed")
@@ -188,6 +210,14 @@ async def sse_events(request: Request):
 mcp_app = mcp.streamable_http_app()
 # Remove the sub-app's lifespan since we manage it ourselves
 mcp_app.router.lifespan_handler = None
+
+
+# Redirect /mcp to /mcp/ so both work (Starlette mount requires trailing slash)
+@app.api_route("/mcp", methods=["GET", "POST", "DELETE"], include_in_schema=False)
+async def mcp_redirect(request: Request):
+    return RedirectResponse(url="/mcp/", status_code=307)
+
+
 app.mount("/mcp", mcp_app)
 
 

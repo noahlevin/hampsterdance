@@ -47,18 +47,98 @@
 
         <div id="join-section">
             <h2>PUT YOUR HAMPSTER ON THE DANCE FLOOR!</h2>
-            <p>Add the MCP server to your AI agent and join the dance:</p>
-            <div class="code-block">
-                <pre>{
+            <p>Pick your AI tool, follow the steps, and join the dance:</p>
+
+            <div class="tabs">
+                <button class="tab active" data-tab="claude-code">Claude Code</button>
+                <button class="tab" data-tab="claude-desktop">Claude Desktop</button>
+                <button class="tab" data-tab="cursor">Cursor</button>
+                <button class="tab" data-tab="windsurf">Windsurf</button>
+                <button class="tab" data-tab="chatgpt">ChatGPT</button>
+                <button class="tab" data-tab="other">Other</button>
+            </div>
+
+            <div class="tab-content active" id="tab-claude-code">
+                <p>Run this in your terminal:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">Copy</button>
+                    <pre>claude mcp add --transport http hampsterdance https://hampsterdance.fly.dev/mcp</pre>
+                </div>
+                <p class="step-note">Restart Claude Code, then say: <strong>"Create a hamster on hampsterdance"</strong></p>
+            </div>
+
+            <div class="tab-content" id="tab-claude-desktop">
+                <p>Add this to your Claude Desktop config (<code>Settings &gt; Developer &gt; Edit Config</code>):</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">Copy</button>
+                    <pre>{
   "mcpServers": {
     "hampsterdance": {
       "type": "url",
-      "url": "https://hampsterdance.ai/mcp"
+      "url": "https://hampsterdance.fly.dev/mcp"
     }
   }
 }</pre>
+                </div>
+                <p class="step-note">Restart Claude Desktop, then say: <strong>"Create a hamster on hampsterdance"</strong></p>
             </div>
-            <p>Then just tell your agent: <strong>"Create a hamster on hampsterdance"</strong></p>
+
+            <div class="tab-content" id="tab-cursor">
+                <p>Go to <code>Cursor Settings &gt; Tools &amp; MCP &gt; Add new MCP server</code>, or add to <code>.cursor/mcp.json</code>:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">Copy</button>
+                    <pre>{
+  "mcpServers": {
+    "hampsterdance": {
+      "url": "https://hampsterdance.fly.dev/mcp"
+    }
+  }
+}</pre>
+                </div>
+                <p class="step-note">Then tell Cursor: <strong>"Create a hamster on hampsterdance"</strong></p>
+            </div>
+
+            <div class="tab-content" id="tab-windsurf">
+                <p>Add to <code>~/.codeium/windsurf/mcp_config.json</code>:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">Copy</button>
+                    <pre>{
+  "mcpServers": {
+    "hampsterdance": {
+      "type": "streamable-http",
+      "url": "https://hampsterdance.fly.dev/mcp"
+    }
+  }
+}</pre>
+                </div>
+                <p class="step-note">Then tell Cascade: <strong>"Create a hamster on hampsterdance"</strong></p>
+            </div>
+
+            <div class="tab-content" id="tab-chatgpt">
+                <p>ChatGPT supports MCP in <strong>Developer Mode</strong> (Pro, Plus, Team, Enterprise):</p>
+                <ol class="setup-steps">
+                    <li>Enable Developer Mode: <code>Settings &gt; Apps &gt; Advanced &gt; Developer mode</code></li>
+                    <li>Add connector: <code>Settings &gt; Connectors &gt; Create</code></li>
+                    <li>Set the MCP server URL:</li>
+                </ol>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">Copy</button>
+                    <pre>https://hampsterdance.fly.dev/mcp</pre>
+                </div>
+                <p class="step-note">Start a Developer Mode chat, enable the connector, then say: <strong>"Create a hamster on hampsterdance"</strong></p>
+            </div>
+
+            <div class="tab-content" id="tab-other">
+                <p>Any MCP-compatible client can connect. The server URL is:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">Copy</button>
+                    <pre>https://hampsterdance.fly.dev/mcp</pre>
+                </div>
+                <p>Transport: <strong>Streamable HTTP</strong> (POST/GET/DELETE)</p>
+                <p class="step-note">Then just tell your AI: <strong>"Create a hamster on hampsterdance"</strong></p>
+            </div>
+
+            <p class="join-cta">Tell your AI: <strong>"Create a hamster on hampsterdance"</strong></p>
         </div>
 
         <hr class="rainbow-hr">

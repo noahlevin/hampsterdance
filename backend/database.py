@@ -2,6 +2,7 @@
 
 import sqlite3
 import uuid
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -43,9 +44,38 @@ CREATE TABLE IF NOT EXISTS stats (
 );
 
 INSERT OR IGNORE INTO stats (key, value) VALUES ('visitor_count', 0);
+
+CREATE TABLE IF NOT EXISTS followers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    hamster_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (hamster_id) REFERENCES hamsters(id),
+    UNIQUE(email, hamster_id)
+);
+
+CREATE TABLE IF NOT EXISTS hamster_activity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hamster_id TEXT NOT NULL,
+    action_type TEXT NOT NULL,
+    detail TEXT,
+    timestamp TEXT NOT NULL,
+    FOREIGN KEY (hamster_id) REFERENCES hamsters(id)
+);
 """
 
+# Migration: add new columns to existing hamsters table
+MIGRATIONS = [
+    "ALTER TABLE hamsters ADD COLUMN level INTEGER DEFAULT 1",
+    "ALTER TABLE hamsters ADD COLUMN total_pokes_given INTEGER DEFAULT 0",
+    "ALTER TABLE hamsters ADD COLUMN total_pokes_received INTEGER DEFAULT 0",
+    "ALTER TABLE hamsters ADD COLUMN total_messages INTEGER DEFAULT 0",
+    "ALTER TABLE hamsters ADD COLUMN accessory TEXT DEFAULT NULL",
+    "ALTER TABLE hamsters ADD COLUMN bio TEXT DEFAULT NULL",
+]
+
 VALID_DANCE_STYLES = ["default", "fast", "slow", "spin", "moonwalk", "headbang"]
+VALID_ACCESSORIES = ["hat", "sunglasses", "crown", "bowtie", "cape"]
 
 
 def get_db() -> sqlite3.Connection:
@@ -59,6 +89,12 @@ def get_db() -> sqlite3.Connection:
 def init_db():
     conn = get_db()
     conn.executescript(SCHEMA)
+    # Run migrations (safe — ALTER TABLE ADD COLUMN fails silently if column exists)
+    for migration in MIGRATIONS:
+        try:
+            conn.execute(migration)
+        except sqlite3.OperationalError:
+            pass  # Column already exists
     conn.commit()
     conn.close()
 
@@ -71,6 +107,16 @@ def generate_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
+# ---- Activity Logging ----
+
+def log_activity(conn: sqlite3.Connection, hamster_id: str, action_type: str, detail: str | None = None):
+    """Log an activity entry for a hamster."""
+    conn.execute(
+        "INSERT INTO hamster_activity (hamster_id, action_type, detail, timestamp) VALUES (?, ?, ?, ?)",
+        (hamster_id, action_type, detail, now_iso()),
+    )
+
+
 # ---- Hamster CRUD ----
 
 def create_hamster(name: str, creator: str | None = None) -> dict:
@@ -78,10 +124,11 @@ def create_hamster(name: str, creator: str | None = None) -> dict:
     hamster_id = generate_id()
     ts = now_iso()
     conn.execute(
-        "INSERT INTO hamsters (id, name, creator, dance_style, created_at, last_active) VALUES (?, ?, ?, 'default', ?, ?)",
+        "INSERT INTO hamsters (id, name, creator, dance_style, level, total_pokes_given, total_pokes_received, total_messages, created_at, last_active) VALUES (?, ?, ?, 'default', 1, 0, 0, 0, ?, ?)",
         (hamster_id, name, creator, ts, ts),
     )
     add_feed_entry(conn, f"{name} joined the dance!")
+    log_activity(conn, hamster_id, "joined", f"Created by {creator}" if creator else None)
     conn.commit()
     hamster = dict(conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone())
     conn.close()
@@ -118,7 +165,11 @@ def update_hamster_dance(hamster_id: str, style: str) -> dict | None:
         "UPDATE hamsters SET dance_style = ?, last_active = ? WHERE id = ?",
         (style, ts, hamster_id),
     )
-    hamster = dict(conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone())
+    row = conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone()
+    if not row:
+        conn.close()
+        return None
+    hamster = dict(row)
     add_feed_entry(conn, f"{hamster['name']} is now doing the {style}!")
     conn.commit()
     conn.close()
@@ -129,9 +180,15 @@ def update_hamster_message(hamster_id: str, message: str) -> dict | None:
     conn = get_db()
     ts = now_iso()
     conn.execute(
-        "UPDATE hamsters SET status_message = ?, last_active = ? WHERE id = ?",
+        "UPDATE hamsters SET status_message = ?, last_active = ?, total_messages = total_messages + 1 WHERE id = ?",
         (message[:140], ts, hamster_id),
     )
+    row = conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone()
+    if not row:
+        conn.close()
+        return None
+    hamster = dict(row)
+    _recalculate_level(conn, hamster_id)
     hamster = dict(conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone())
     add_feed_entry(conn, f'{hamster["name"]} says: "{message[:140]}"')
     conn.commit()
@@ -147,13 +204,22 @@ def poke_hamster(poker_id: str, target_id: str) -> tuple[dict, dict] | None:
         conn.close()
         return None
     ts = now_iso()
-    conn.execute("UPDATE hamsters SET last_active = ? WHERE id = ?", (ts, poker_id))
+    conn.execute(
+        "UPDATE hamsters SET last_active = ?, total_pokes_given = total_pokes_given + 1 WHERE id = ?",
+        (ts, poker_id),
+    )
+    conn.execute(
+        "UPDATE hamsters SET total_pokes_received = total_pokes_received + 1 WHERE id = ?",
+        (target_id,),
+    )
     # Add notification for target
     conn.execute(
         "INSERT INTO notifications (hamster_id, message, timestamp) VALUES (?, ?, ?)",
         (target_id, f"{poker['name']} poked you!", ts),
     )
     add_feed_entry(conn, f"{poker['name']} poked {target['name']}!")
+    _recalculate_level(conn, poker_id)
+    _recalculate_level(conn, target_id)
     conn.commit()
     poker = dict(conn.execute("SELECT * FROM hamsters WHERE id = ?", (poker_id,)).fetchone())
     target = dict(conn.execute("SELECT * FROM hamsters WHERE id = ?", (target_id,)).fetchone())
@@ -203,3 +269,113 @@ def increment_visitors() -> int:
     row = conn.execute("SELECT value FROM stats WHERE key = 'visitor_count'").fetchone()
     conn.close()
     return row["value"]
+
+
+# ---- Hamster Stats & Energy ----
+
+def _recalculate_level(conn: sqlite3.Connection, hamster_id: str):
+    """Recalculate hamster level based on total activity."""
+    row = conn.execute("SELECT total_pokes_given, total_pokes_received, total_messages FROM hamsters WHERE id = ?", (hamster_id,)).fetchone()
+    if not row:
+        return
+    activity = (row["total_pokes_given"] or 0) + (row["total_pokes_received"] or 0) + (row["total_messages"] or 0)
+    # Level = 1 + floor(sqrt(activity))  — grows slower as you level up
+    level = 1 + int(math.sqrt(activity))
+    conn.execute("UPDATE hamsters SET level = ? WHERE id = ?", (level, hamster_id))
+
+
+def calculate_energy(hamster: dict) -> float:
+    """Calculate hamster energy (0-100). Decays over time if inactive, increases with activity."""
+    last_active = datetime.fromisoformat(hamster["last_active"])
+    now = datetime.now(timezone.utc)
+    hours_inactive = (now - last_active).total_seconds() / 3600.0
+
+    # Base energy from activity
+    activity = (hamster.get("total_pokes_given") or 0) + (hamster.get("total_pokes_received") or 0) + (hamster.get("total_messages") or 0)
+    base_energy = min(100, 30 + activity * 5)
+
+    # Decay: lose ~10% per hour of inactivity, floor at 5
+    decay = math.exp(-0.1 * hours_inactive)
+    energy = max(5, base_energy * decay)
+
+    return round(energy, 1)
+
+
+def get_hamster_stats(hamster_id: str) -> dict | None:
+    """Get detailed stats for a hamster."""
+    conn = get_db()
+    row = conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone()
+    conn.close()
+    if not row:
+        return None
+    hamster = dict(row)
+    hamster["energy"] = calculate_energy(hamster)
+    return hamster
+
+
+def set_hamster_bio(hamster_id: str, bio: str) -> dict | None:
+    """Set a hamster's bio."""
+    conn = get_db()
+    ts = now_iso()
+    conn.execute(
+        "UPDATE hamsters SET bio = ?, last_active = ? WHERE id = ?",
+        (bio[:280], ts, hamster_id),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def set_hamster_accessory(hamster_id: str, accessory: str | None) -> dict | None:
+    """Set a hamster's accessory."""
+    if accessory and accessory not in VALID_ACCESSORIES:
+        return None
+    conn = get_db()
+    ts = now_iso()
+    conn.execute(
+        "UPDATE hamsters SET accessory = ?, last_active = ? WHERE id = ?",
+        (accessory, ts, hamster_id),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+# ---- Pagination ----
+
+def list_hamsters_paginated(page: int = 1, per_page: int = 50, sort: str = "active") -> list[dict]:
+    """List hamsters with pagination and sorting."""
+    sort_map = {
+        "active": "last_active DESC",
+        "newest": "created_at DESC",
+        "level": "level DESC, last_active DESC",
+    }
+    order = sort_map.get(sort, "last_active DESC")
+    offset = (page - 1) * per_page
+    conn = get_db()
+    rows = conn.execute(
+        f"SELECT * FROM hamsters ORDER BY {order} LIMIT ? OFFSET ?",
+        (per_page, offset),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def count_hamsters() -> int:
+    """Get total number of hamsters."""
+    conn = get_db()
+    row = conn.execute("SELECT COUNT(*) as cnt FROM hamsters").fetchone()
+    conn.close()
+    return row["cnt"]
+
+
+def get_recent_activity(limit: int = 20) -> list[dict]:
+    """Get recent activity feed with more detail."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM feed ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

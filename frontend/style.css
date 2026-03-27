@@ -247,27 +247,181 @@ body {
     margin-bottom: 10px;
 }
 
-#join-section p {
+#join-section > p {
     font-size: 14px;
+    margin: 5px 0 10px 0;
+}
+
+/* Tabs — Windows 98 style */
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    justify-content: center;
+    margin-bottom: 0;
+    padding: 0 5px;
+}
+
+.tab {
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive, sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 6px 14px;
+    background: #C0C0C0;
+    border: 2px outset #DFDFDF;
+    border-bottom: none;
+    cursor: pointer;
+    color: #333;
+    position: relative;
+    top: 2px;
+    z-index: 1;
+    border-radius: 3px 3px 0 0;
+}
+
+.tab:hover {
+    background: #D4D0C8;
+}
+
+.tab.active {
+    background: #FFFFFF;
+    border: 2px solid #9999CC;
+    border-bottom: 2px solid #FFFFFF;
+    color: #000;
+    z-index: 3;
+}
+
+/* Tab content */
+.tab-content {
+    display: none;
+    text-align: left;
+    padding: 15px;
+    border: 2px solid #9999CC;
+    background: #FFFFFF;
+    margin: 0 5px 10px 5px;
+    position: relative;
+    z-index: 2;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.tab-content p {
+    font-size: 13px;
     margin: 5px 0;
 }
 
+.tab-content code {
+    background: #E8E8E8;
+    padding: 1px 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    border: 1px solid #CCC;
+}
+
+.step-note {
+    font-size: 13px;
+    margin-top: 8px !important;
+    color: #333;
+}
+
+.setup-steps {
+    font-size: 13px;
+    text-align: left;
+    padding-left: 20px;
+    margin: 5px 0;
+}
+
+.setup-steps li {
+    margin: 3px 0;
+}
+
+.setup-steps code {
+    background: #E8E8E8;
+    padding: 1px 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    border: 1px solid #CCC;
+}
+
+/* Code block */
 .code-block {
     background: #1a1a2e;
     color: #00FF00;
     border: 2px solid #333;
     border-radius: 5px;
     padding: 15px;
-    margin: 10px auto;
-    max-width: 500px;
+    margin: 10px 0;
     text-align: left;
     font-family: 'Courier New', monospace;
     font-size: 13px;
     overflow-x: auto;
+    position: relative;
 }
 
 .code-block pre {
     white-space: pre;
+    margin: 0;
+    padding-right: 55px;
+}
+
+/* Copy button */
+.copy-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-family: 'Comic Sans MS', 'Comic Neue', cursive, sans-serif;
+    font-size: 11px;
+    padding: 3px 8px;
+    background: #C0C0C0;
+    border: 2px outset #DFDFDF;
+    cursor: pointer;
+    color: #333;
+}
+
+.copy-btn:hover {
+    background: #D4D0C8;
+}
+
+.copy-btn:active {
+    border-style: inset;
+}
+
+.copy-btn.copied {
+    background: #66CC66;
+    color: #000;
+}
+
+/* Join CTA */
+.join-cta {
+    font-size: 16px;
+    margin-top: 10px;
+    padding: 8px;
+    background: #FFFFCC;
+    border: 2px dashed #FF6600;
+    color: #333;
+}
+
+/* Responsive tabs */
+@media (max-width: 600px) {
+    .tab {
+        font-size: 11px;
+        padding: 5px 8px;
+    }
+
+    .tab-content {
+        margin: 0 0 10px 0;
+    }
+
+    .code-block {
+        font-size: 11px;
+        padding: 10px;
+    }
+
+    .code-block pre {
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
 }
 
 /* Footer */

@@ -241,10 +241,59 @@ function connectSSE() {
     };
 }
 
+// ---- Tabs & Copy Buttons ----
+function initTabs() {
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Deactivate all tabs and panels
+            tabs.forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active'));
+
+            // Activate clicked tab and its panel
+            tab.classList.add('active');
+            const panel = document.getElementById('tab-' + tab.dataset.tab);
+            if (panel) panel.classList.add('active');
+        });
+    });
+}
+
+function copyCode(btn) {
+    const codeBlock = btn.closest('.code-block');
+    const pre = codeBlock.querySelector('pre');
+    const text = pre.textContent;
+
+    navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+
 // ---- Init ----
 async function init() {
     await Promise.all([fetchHamsters(), fetchFeed(), recordVisit()]);
     connectSSE();
+    initTabs();
 
     // Fallback polling in case SSE drops
     setInterval(fetchHamsters, 30000);
