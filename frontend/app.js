@@ -8,6 +8,10 @@ const HAMSTER_GIFS = [
     'assets/hamster-dance-2.gif',
     'assets/hamster-dance-3.gif',
     'assets/hamster-dance-4.gif',
+    'assets/hamster-dance-5.gif',
+    'assets/hamster-dance-6.gif',
+    'assets/hamster-dance-7.gif',
+    'assets/hamster-dance-8.gif',
 ];
 
 let hamsters = {};
@@ -48,10 +52,25 @@ function updateMuteButton() {
 }
 
 // ---- Hamster Rendering ----
-function getHamsterGif(hamsterId) {
-    // Deterministic GIF selection based on ID
-    const index = hashCode(hamsterId) % HAMSTER_GIFS.length;
+function getHamsterGif(hamster) {
+    // Use base_gif trait from database if available, fallback to hash
+    if (hamster && typeof hamster === 'object' && hamster.base_gif) {
+        const gifNum = Math.min(Math.max(hamster.base_gif, 1), HAMSTER_GIFS.length);
+        return HAMSTER_GIFS[gifNum - 1];
+    }
+    // Fallback for string IDs (search results, etc.)
+    const id = (typeof hamster === 'string') ? hamster : hamster.id;
+    const index = hashCode(id) % HAMSTER_GIFS.length;
     return HAMSTER_GIFS[Math.abs(index)];
+}
+
+function getAccessoryEmoji(accessory) {
+    const map = {
+        'hat': '\u{1F3A9}', 'sunglasses': '\u{1F576}\uFE0F', 'crown': '\u{1F451}',
+        'bowtie': '\u{1F380}', 'cape': '\u{1F9E3}', 'party-hat': '\u{1F973}',
+        'headband': '\u{1F338}', 'monocle': '\u{1F9D0}'
+    };
+    return map[accessory] || '';
 }
 
 function hashCode(str) {
@@ -71,7 +90,7 @@ function renderHamster(hamster) {
     tile.dataset.hamsterId = hamster.id;
 
     const img = document.createElement('img');
-    img.src = getHamsterGif(hamster.id);
+    img.src = getHamsterGif(hamster);
     img.alt = hamster.name;
     img.title = `${hamster.name}${hamster.creator ? ' (by ' + hamster.creator + ')' : ''}`;
 
@@ -81,6 +100,49 @@ function renderHamster(hamster) {
 
     tile.appendChild(img);
     tile.appendChild(name);
+
+    // ---- Apply Boring Apes traits ----
+
+    // Body hue (CSS hue-rotate filter)
+    const filters = [];
+    if (hamster.body_hue != null && hamster.body_hue !== 0) {
+        filters.push(`hue-rotate(${hamster.body_hue}deg)`);
+    }
+
+    // Glow effect (drop-shadow using hamster's hue color)
+    if (hamster.has_glow) {
+        tile.classList.add('hamster-glow');
+        const hue = hamster.body_hue || 0;
+        filters.push(`drop-shadow(0 0 8px hsl(${hue}, 80%, 60%))`);
+    }
+
+    if (filters.length > 0) {
+        img.style.filter = filters.join(' ');
+    }
+
+    // Size scale (applied to the tile via transform)
+    if (hamster.size_scale != null && hamster.size_scale !== 1.0) {
+        tile.style.transform = `scale(${hamster.size_scale})`;
+        tile.style.transformOrigin = 'center bottom';
+    }
+
+    // Flip (CSS scaleX)
+    if (hamster.is_flipped) {
+        img.style.transform = 'scaleX(-1)';
+    }
+
+    // Animation speed (modify the dance animation duration)
+    if (hamster.anim_speed != null && hamster.anim_speed !== 1.0) {
+        img.style.animationDuration = `${0.5 * hamster.anim_speed}s`;
+    }
+
+    // Accessory (emoji overlay)
+    if (hamster.accessory) {
+        const acc = document.createElement('span');
+        acc.className = `accessory accessory-${hamster.accessory}`;
+        acc.textContent = getAccessoryEmoji(hamster.accessory);
+        tile.appendChild(acc);
+    }
 
     // Click to open profile
     tile.addEventListener('click', (e) => {
@@ -158,10 +220,10 @@ function renderAllHamsters() {
         overflowDiv.style.display = 'none';
     }
 
-    // Show browse section if there are hamsters
-    const browseSection = document.getElementById('browse-section');
-    if (totalHamsterCount > 0) {
-        browseSection.style.display = 'block';
+    // Show browse trigger button if there are hamsters
+    const browseTrigger = document.getElementById('browse-trigger');
+    if (totalHamsterCount > 0 && browseTrigger) {
+        browseTrigger.style.display = 'block';
     }
 }
 
@@ -321,6 +383,37 @@ function connectSSE() {
         addFeedEntry(data.message, data.timestamp);
     });
 
+    eventSource.addEventListener('battle_started', (e) => {
+        const battle = JSON.parse(e.data);
+        addFeedEntry(`${battle.challenger_name} started BEEF with ${battle.defender_name}: "${battle.challenger_diss}"`);
+        fetchBattles();
+    });
+
+    eventSource.addEventListener('battle_responded', (e) => {
+        const battle = JSON.parse(e.data);
+        addFeedEntry(`${battle.defender_name} clapped back at ${battle.challenger_name}: "${battle.defender_diss}"`);
+        fetchBattles();
+    });
+
+    eventSource.addEventListener('battle_cheered', (e) => {
+        fetchBattles();
+    });
+
+    eventSource.addEventListener('conga_joined', (e) => {
+        fetchConga();
+    });
+
+    eventSource.addEventListener('conga_left', (e) => {
+        fetchConga();
+    });
+
+    eventSource.addEventListener('hamster_woke', (e) => {
+        const hamster = JSON.parse(e.data);
+        addFeedEntry(`${hamster.name} woke up from the cuddle puddle! Rise and shine!`);
+        fetchSleepy();
+        fetchHamsters();
+    });
+
     eventSource.onerror = () => {
         console.log('SSE connection lost, reconnecting in 5s...');
         setTimeout(connectSSE, 5000);
@@ -373,6 +466,25 @@ function copyCode(btn) {
             btn.classList.remove('copied');
         }, 2000);
     });
+}
+
+// ---- Feed Toggle ----
+function toggleFeed() {
+    document.getElementById('activity-feed').classList.toggle('collapsed');
+}
+
+// ---- Browse Drawer ----
+function toggleBrowse() {
+    const drawer = document.getElementById('browse-drawer');
+    const overlay = document.getElementById('browse-overlay');
+    const isOpen = drawer.classList.contains('open');
+    drawer.classList.toggle('open');
+    overlay.classList.toggle('open');
+
+    // Load first page when opening for the first time
+    if (!isOpen && document.getElementById('browse-list').children.length === 0) {
+        loadBrowsePage(1);
+    }
 }
 
 // ---- Browse All Hamsters ----
@@ -520,7 +632,7 @@ async function performSearch(query) {
             }
 
             item.innerHTML = `
-                <img src="${getHamsterGif(h.id)}" alt="">
+                <img src="${getHamsterGif(h)}" alt="">
                 <span class="search-result-name">${escapeHtml(h.name)}</span>
                 <span class="search-result-creator">${h.creator ? 'by ' + escapeHtml(h.creator) : ''}</span>
                 <span class="search-result-style">${h.dance_style || 'default'}</span>
@@ -589,6 +701,13 @@ function renderProfile(hamster, activity, followerCount) {
     document.getElementById('profile-accessory').textContent = hamster.accessory ? 'Accessory: ' + hamster.accessory : '';
     document.getElementById('profile-level').textContent = 'Level: ' + (hamster.level || 1);
 
+    // Zodiac sign
+    const zodiacEl = document.getElementById('profile-zodiac');
+    if (zodiacEl) {
+        const sign = getZodiacSign(hamster.created_at);
+        zodiacEl.textContent = 'Zodiac: ' + sign;
+    }
+
     // Bio
     const bioEl = document.getElementById('profile-bio');
     if (hamster.bio) {
@@ -656,6 +775,18 @@ function formatActivity(activity) {
             return 'Got poked by ' + (activity.detail || 'someone');
         case 'set_bio':
             return 'Updated their bio';
+        case 'diss_started':
+            return 'Started beef: ' + (activity.detail || '');
+        case 'diss_received':
+            return 'Got dissed: ' + (activity.detail || '');
+        case 'diss_responded':
+            return 'Clapped back: ' + (activity.detail || '');
+        case 'conga_joined':
+            return 'Joined the conga line!';
+        case 'conga_left':
+            return 'Left the conga line';
+        case 'woke_up':
+            return 'Woke up from the cuddle puddle!';
         default:
             return activity.action_type + (activity.detail ? ': ' + activity.detail : '');
     }
@@ -732,8 +863,11 @@ async function init() {
     initTabs();
     initSearch();
 
-    // Load first page of browse section
-    loadBrowsePage(1);
+    // Hide browse trigger initially (shown when hamsters load)
+    const browseTrigger = document.getElementById('browse-trigger');
+    if (browseTrigger && totalHamsterCount === 0) {
+        browseTrigger.style.display = 'none';
+    }
 
     // Fallback polling in case SSE drops
     setInterval(fetchHamsters, 30000);
