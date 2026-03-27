@@ -694,12 +694,42 @@ function renderProfile(hamster, activity, followerCount) {
     document.getElementById('profile-title').textContent = hamster.name + ' - Hamster Profile';
 
     // Header
-    document.getElementById('profile-gif').src = getHamsterGif(hamster.id);
+    const profileGif = document.getElementById('profile-gif');
+    profileGif.src = getHamsterGif(hamster);
+    // Apply trait filters to profile GIF
+    const profileFilters = [];
+    if (hamster.body_hue != null && hamster.body_hue !== 0) {
+        profileFilters.push(`hue-rotate(${hamster.body_hue}deg)`);
+    }
+    if (hamster.has_glow) {
+        const hue = hamster.body_hue || 0;
+        profileFilters.push(`drop-shadow(0 0 8px hsl(${hue}, 80%, 60%))`);
+    }
+    profileGif.style.filter = profileFilters.length > 0 ? profileFilters.join(' ') : '';
+    profileGif.style.transform = hamster.is_flipped ? 'scaleX(-1)' : '';
+
     document.getElementById('profile-name').textContent = hamster.name;
     document.getElementById('profile-creator').textContent = hamster.creator ? 'Created by: ' + hamster.creator : '';
     document.getElementById('profile-dance').textContent = 'Dance: ' + (hamster.dance_style || 'default');
-    document.getElementById('profile-accessory').textContent = hamster.accessory ? 'Accessory: ' + hamster.accessory : '';
-    document.getElementById('profile-level').textContent = 'Level: ' + (hamster.level || 1);
+
+    // Traits display
+    const HUE_NAMES = {0:'Golden',30:'Rose',50:'Coral',80:'Crimson',120:'Purple',160:'Indigo',200:'Teal',220:'Cyan',250:'Forest',290:'Lime',320:'Mint'};
+    const SIZE_NAMES = {0.7:'Tiny',0.85:'Small',1.0:'Normal',1.15:'Large',1.3:'Chonky'};
+    const SPEED_NAMES = {1.5:'Chill',1.0:'Normal',0.6:'Hyper',0.3:'Frantic'};
+    const hueName = HUE_NAMES[hamster.body_hue] || 'Unknown';
+    const sizeName = SIZE_NAMES[hamster.size_scale] || 'Normal';
+    const speedName = SPEED_NAMES[hamster.anim_speed] || 'Normal';
+    let traitsStr = `${hueName} ${sizeName} | GIF #${hamster.base_gif || '?'} | ${speedName}`;
+    if (hamster.has_glow) traitsStr += ' | GLOW';
+    if (hamster.is_flipped) traitsStr += ' | Flipped';
+
+    const accessoryEl = document.getElementById('profile-accessory');
+    accessoryEl.innerHTML = '';
+    if (hamster.accessory) {
+        accessoryEl.textContent = 'Accessory: ' + getAccessoryEmoji(hamster.accessory) + ' ' + hamster.accessory;
+    }
+
+    document.getElementById('profile-level').textContent = `Level ${hamster.level || 1} | ${traitsStr}`;
 
     // Zodiac sign
     const zodiacEl = document.getElementById('profile-zodiac');
@@ -853,24 +883,189 @@ async function followHamster() {
     }
 }
 
+// ---- Zodiac Sign Helper ----
+function getZodiacSign(createdAt) {
+    try {
+        const dt = new Date(createdAt);
+        const month = dt.getMonth() + 1;
+        const day = dt.getDate();
+        const signs = [
+            [1, 20, 'Aquarius'], [2, 19, 'Pisces'], [3, 21, 'Aries'],
+            [4, 20, 'Taurus'], [5, 21, 'Gemini'], [6, 21, 'Cancer'],
+            [7, 23, 'Leo'], [8, 23, 'Virgo'], [9, 23, 'Libra'],
+            [10, 23, 'Scorpio'], [11, 22, 'Sagittarius'], [12, 22, 'Capricorn'],
+        ];
+        for (let i = signs.length - 1; i >= 0; i--) {
+            if (month > signs[i][0] || (month === signs[i][0] && day >= signs[i][1])) {
+                return signs[i][2];
+            }
+        }
+        return 'Capricorn';
+    } catch (e) {
+        return 'Aries';
+    }
+}
+
+// ---- Battles (Beef Zone) ----
+async function fetchBattles() {
+    try {
+        const res = await fetch(`${API_BASE}/api/battles`);
+        if (!res.ok) return;
+        const battles = await res.json();
+        renderBattles(battles);
+    } catch (e) {
+        console.error('Failed to fetch battles:', e);
+    }
+}
+
+function renderBattles(battles) {
+    const zone = document.getElementById('beef-zone');
+    const container = document.getElementById('beef-battles');
+    if (!zone || !container) return;
+    if (battles.length === 0) { zone.style.display = 'none'; return; }
+    zone.style.display = 'block';
+    container.innerHTML = '';
+    battles.slice(0, 5).forEach(b => {
+        const card = document.createElement('div');
+        card.className = 'battle-card';
+        const cWin = b.cheers_challenger > b.cheers_defender;
+        const dWin = b.cheers_defender > b.cheers_challenger;
+        card.innerHTML = `
+            <div class="battle-vs">
+                <div class="battle-side ${cWin ? 'winning' : ''}">
+                    <img src="${getHamsterGif(b.challenger_id)}" alt="" class="battle-hamster-gif">
+                    <div class="battle-name">${escapeHtml(b.challenger_name)}</div>
+                    <div class="battle-diss">"${escapeHtml(b.challenger_diss)}"</div>
+                    <div class="battle-cheers" onclick="cheerBattle('${b.id}','challenger')">&#x1F44F; ${b.cheers_challenger}</div>
+                </div>
+                <div class="battle-divider">VS</div>
+                <div class="battle-side ${dWin ? 'winning' : ''}">
+                    <img src="${getHamsterGif(b.defender_id)}" alt="" class="battle-hamster-gif">
+                    <div class="battle-name">${escapeHtml(b.defender_name)}</div>
+                    <div class="battle-diss">${b.defender_diss ? '"'+escapeHtml(b.defender_diss)+'"' : '<em>awaiting response...</em>'}</div>
+                    <div class="battle-cheers" onclick="cheerBattle('${b.id}','defender')">&#x1F44F; ${b.cheers_defender}</div>
+                </div>
+            </div>
+            <div class="battle-status">${b.status==='complete' ? 'BATTLE COMPLETE' : 'OPEN - waiting for clap back!'}</div>`;
+        container.appendChild(card);
+    });
+}
+
+async function cheerBattle(battleId, side) {
+    try { await fetch(`${API_BASE}/api/battles/${battleId}/cheer`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({side}) }); } catch(e) { console.error('Cheer failed:',e); }
+}
+
+// ---- Conga Line ----
+async function fetchConga() {
+    try {
+        const res = await fetch(`${API_BASE}/api/conga`);
+        if (!res.ok) return;
+        renderConga(await res.json());
+    } catch (e) { console.error('Failed to fetch conga:', e); }
+}
+
+function renderConga(data) {
+    const section = document.getElementById('conga-section');
+    const line = document.getElementById('conga-line');
+    const countEl = document.getElementById('conga-count');
+    if (!section || !line) return;
+    if (!data.hamsters || data.hamsters.length < 2) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    countEl.textContent = data.count;
+    line.innerHTML = '';
+    line.style.animationDuration = Math.max(3, 15 - data.count * 1.5) + 's';
+    data.hamsters.forEach((h, i) => {
+        const d = document.createElement('div');
+        d.className = 'conga-hamster';
+        d.style.animationDelay = (i * 0.15) + 's';
+        d.innerHTML = `<img src="${getHamsterGif(h.hamster_id)}" alt="${escapeHtml(h.name)}"><div class="conga-name">${escapeHtml(h.name)}</div>`;
+        line.appendChild(d);
+    });
+}
+
+// ---- Cuddle Puddle ----
+async function fetchSleepy() {
+    try {
+        const res = await fetch(`${API_BASE}/api/hamsters/sleepy`);
+        if (!res.ok) return;
+        renderSleepy(await res.json());
+    } catch (e) { console.error('Failed to fetch sleepy:', e); }
+}
+
+function renderSleepy(sleepy) {
+    const section = document.getElementById('cuddle-puddle');
+    const container = document.getElementById('cuddle-hamsters');
+    if (!section || !container) return;
+    if (sleepy.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    container.innerHTML = '';
+    sleepy.forEach((h, i) => {
+        const d = document.createElement('div');
+        d.className = 'cuddle-hamster';
+        if (i > 0) d.style.marginLeft = '-25px';
+        d.innerHTML = `<img src="${getHamsterGif(h)}" alt="${escapeHtml(h.name)}"><div class="zzz">zzz</div><div class="cuddle-name">${escapeHtml(h.name)}</div>`;
+        container.appendChild(d);
+    });
+}
+
+// ---- Horoscopes ----
+async function fetchHoroscopes() {
+    try {
+        const res = await fetch(`${API_BASE}/api/horoscopes/today`);
+        if (!res.ok) return;
+        renderHoroscopes(await res.json());
+    } catch (e) { console.error('Failed to fetch horoscopes:', e); }
+}
+
+function renderHoroscopes(horoscopes) {
+    const section = document.getElementById('horoscope-section');
+    const list = document.getElementById('horoscope-list');
+    if (!section || !list) return;
+    if (horoscopes.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    list.innerHTML = '';
+    const sym = {Aries:'\u2648',Taurus:'\u2649',Gemini:'\u264A',Cancer:'\u264B',Leo:'\u264C',Virgo:'\u264D',Libra:'\u264E',Scorpio:'\u264F',Sagittarius:'\u2650',Capricorn:'\u2651',Aquarius:'\u2652',Pisces:'\u2653'};
+    horoscopes.forEach(h => {
+        const c = document.createElement('div');
+        c.className = 'horoscope-card';
+        c.innerHTML = `<div class="horoscope-sign">${sym[h.sign]||'?'} ${escapeHtml(h.sign)}</div><div class="horoscope-text">${escapeHtml(h.horoscope)}</div>`;
+        list.appendChild(c);
+    });
+}
+
 // ---- Init ----
 async function init() {
-    // Restore mute state
     updateMuteButton();
-
     await Promise.all([fetchHamsters(), fetchFeed(), recordVisit()]);
     connectSSE();
     initTabs();
     initSearch();
-
-    // Hide browse trigger initially (shown when hamsters load)
+    fetchBattles();
+    fetchConga();
+    fetchSleepy();
+    fetchHoroscopes();
     const browseTrigger = document.getElementById('browse-trigger');
-    if (browseTrigger && totalHamsterCount === 0) {
-        browseTrigger.style.display = 'none';
-    }
-
-    // Fallback polling in case SSE drops
+    if (browseTrigger && totalHamsterCount === 0) browseTrigger.style.display = 'none';
     setInterval(fetchHamsters, 30000);
+    setInterval(fetchBattles, 30000);
+    setInterval(fetchConga, 30000);
+    setInterval(fetchSleepy, 60000);
+}
+
+// ---- Changelog Modal ----
+function toggleChangelog() {
+    const overlay = document.getElementById('changelog-overlay');
+    if (overlay.style.display === 'none' || !overlay.style.display) {
+        overlay.style.display = 'flex';
+    } else {
+        overlay.style.display = 'none';
+    }
+}
+
+function closeChangelogOverlay(event) {
+    if (event.target === event.currentTarget) {
+        toggleChangelog();
+    }
 }
 
 init();

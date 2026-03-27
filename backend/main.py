@@ -97,6 +97,12 @@ async def api_search_hamsters(q: str = ""):
     return JSONResponse(results)
 
 
+@app.get("/api/hamsters/sleepy")
+async def api_sleepy_hamsters():
+    sleepy = db.get_sleepy_hamsters()
+    return JSONResponse(sleepy)
+
+
 @app.get("/api/hamsters/by-name/{name:path}")
 async def api_get_hamster_by_name(name: str):
     hamster = db.get_hamster_by_name(name)
@@ -208,6 +214,23 @@ async def api_follower_count(hamster_id: str):
     return JSONResponse({"count": count})
 
 
+@app.post("/api/hamsters/{hamster_id}/wake")
+async def api_wake_hamster(hamster_id: str):
+    hamster = db.wake_up_hamster(hamster_id)
+    if not hamster:
+        return JSONResponse({"error": "Hamster not found"}, status_code=404)
+    await bus.publish("hamster_woke", hamster)
+    return JSONResponse(hamster)
+
+
+@app.get("/api/hamsters/{hamster_id}/horoscope")
+async def api_hamster_horoscope(hamster_id: str):
+    horoscope = db.get_hamster_horoscope(hamster_id)
+    if not horoscope:
+        return JSONResponse({"error": "Hamster not found"}, status_code=404)
+    return JSONResponse(horoscope)
+
+
 @app.get("/api/activity")
 async def api_activity(limit: int = 20):
     return JSONResponse(db.get_recent_activity(min(limit, 100)))
@@ -222,6 +245,126 @@ async def api_feed(limit: int = 20):
 async def api_visit():
     count = db.increment_visitors()
     return JSONResponse({"count": count})
+
+
+# ---- Battles API ----
+
+@app.post("/api/battles")
+async def api_create_battle(request: Request):
+    body = await request.json()
+    challenger_id = body.get("challenger_id", "").strip()
+    defender_id = body.get("defender_id", "").strip()
+    diss = body.get("diss", "").strip()
+    if not challenger_id or not defender_id or not diss:
+        return JSONResponse({"error": "challenger_id, defender_id, and diss are required"}, status_code=400)
+    if len(diss) > 140:
+        return JSONResponse({"error": "Diss too long! Max 140 chars."}, status_code=400)
+    if challenger_id == defender_id:
+        return JSONResponse({"error": "You can't beef with yourself!"}, status_code=400)
+    battle = db.create_battle(challenger_id, defender_id, diss)
+    if not battle:
+        return JSONResponse({"error": "Hamster not found"}, status_code=404)
+    await bus.publish("battle_started", battle)
+    return JSONResponse(battle, status_code=201)
+
+
+@app.post("/api/battles/{battle_id}/respond")
+async def api_respond_battle(battle_id: str, request: Request):
+    body = await request.json()
+    hamster_id = body.get("hamster_id", "").strip()
+    diss = body.get("diss", "").strip()
+    if not hamster_id or not diss:
+        return JSONResponse({"error": "hamster_id and diss are required"}, status_code=400)
+    if len(diss) > 140:
+        return JSONResponse({"error": "Diss too long! Max 140 chars."}, status_code=400)
+    battle = db.respond_to_battle(battle_id, hamster_id, diss)
+    if not battle:
+        return JSONResponse({"error": "Battle not found, already responded, or you're not the defender"}, status_code=400)
+    await bus.publish("battle_responded", battle)
+    return JSONResponse(battle)
+
+
+@app.post("/api/battles/{battle_id}/cheer")
+async def api_cheer_battle(battle_id: str, request: Request):
+    body = await request.json()
+    side = body.get("side", "").strip()
+    if side not in ("challenger", "defender"):
+        return JSONResponse({"error": "side must be 'challenger' or 'defender'"}, status_code=400)
+    battle = db.cheer_battle(battle_id, side)
+    if not battle:
+        return JSONResponse({"error": "Battle not found"}, status_code=404)
+    await bus.publish("battle_cheered", battle)
+    return JSONResponse(battle)
+
+
+@app.get("/api/battles")
+async def api_list_battles(status: str | None = None):
+    battles = db.list_battles(status)
+    return JSONResponse(battles)
+
+
+@app.get("/api/battles/{battle_id}")
+async def api_get_battle(battle_id: str):
+    battle = db.get_battle(battle_id)
+    if not battle:
+        return JSONResponse({"error": "Battle not found"}, status_code=404)
+    return JSONResponse(battle)
+
+
+# ---- Conga Line API ----
+
+@app.post("/api/conga/join")
+async def api_join_conga(request: Request):
+    body = await request.json()
+    hamster_id = body.get("hamster_id", "").strip()
+    if not hamster_id:
+        return JSONResponse({"error": "hamster_id is required"}, status_code=400)
+    result = db.join_conga(hamster_id)
+    if result is None:
+        return JSONResponse({"error": "Hamster not found"}, status_code=404)
+    await bus.publish("conga_joined", result)
+    return JSONResponse(result)
+
+
+@app.post("/api/conga/leave")
+async def api_leave_conga(request: Request):
+    body = await request.json()
+    hamster_id = body.get("hamster_id", "").strip()
+    if not hamster_id:
+        return JSONResponse({"error": "hamster_id is required"}, status_code=400)
+    result = db.leave_conga(hamster_id)
+    if result is None:
+        return JSONResponse({"error": "Hamster not found"}, status_code=404)
+    await bus.publish("conga_left", result)
+    return JSONResponse(result)
+
+
+@app.get("/api/conga")
+async def api_get_conga():
+    return JSONResponse(db.get_conga_line())
+
+
+@app.delete("/api/conga")
+async def api_break_conga():
+    result = db.break_conga()
+    await bus.publish("conga_left", result)
+    return JSONResponse(result)
+
+
+# ---- Horoscopes API ----
+
+@app.get("/api/horoscopes/today")
+async def api_horoscopes_today():
+    horoscopes = db.generate_daily_horoscopes()
+    return JSONResponse(horoscopes)
+
+
+@app.get("/api/horoscopes/{sign}")
+async def api_horoscope_sign(sign: str):
+    horoscope = db.get_horoscope_for_sign(sign.capitalize())
+    if not horoscope:
+        return JSONResponse({"error": "Horoscope not found for that sign"}, status_code=404)
+    return JSONResponse(horoscope)
 
 
 # ---- SSE ----
