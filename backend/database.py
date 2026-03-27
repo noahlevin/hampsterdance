@@ -171,6 +171,7 @@ def update_hamster_dance(hamster_id: str, style: str) -> dict | None:
         return None
     hamster = dict(row)
     add_feed_entry(conn, f"{hamster['name']} is now doing the {style}!")
+    log_activity(conn, hamster_id, "danced", style)
     conn.commit()
     conn.close()
     return hamster
@@ -191,6 +192,7 @@ def update_hamster_message(hamster_id: str, message: str) -> dict | None:
     _recalculate_level(conn, hamster_id)
     hamster = dict(conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone())
     add_feed_entry(conn, f'{hamster["name"]} says: "{message[:140]}"')
+    log_activity(conn, hamster_id, "said", message[:140])
     conn.commit()
     conn.close()
     return hamster
@@ -218,6 +220,8 @@ def poke_hamster(poker_id: str, target_id: str) -> tuple[dict, dict] | None:
         (target_id, f"{poker['name']} poked you!", ts),
     )
     add_feed_entry(conn, f"{poker['name']} poked {target['name']}!")
+    log_activity(conn, poker_id, "poked", target['name'])
+    log_activity(conn, target_id, "was_poked", poker['name'])
     _recalculate_level(conn, poker_id)
     _recalculate_level(conn, target_id)
     conn.commit()
@@ -321,6 +325,7 @@ def set_hamster_bio(hamster_id: str, bio: str) -> dict | None:
         "UPDATE hamsters SET bio = ?, last_active = ? WHERE id = ?",
         (bio[:280], ts, hamster_id),
     )
+    log_activity(conn, hamster_id, "set_bio", bio[:280])
     conn.commit()
     row = conn.execute("SELECT * FROM hamsters WHERE id = ?", (hamster_id,)).fetchone()
     conn.close()
@@ -376,6 +381,67 @@ def get_recent_activity(limit: int = 20) -> list[dict]:
     conn = get_db()
     rows = conn.execute(
         "SELECT * FROM feed ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# ---- Search ----
+
+def search_hamsters(query: str, limit: int = 20) -> list[dict]:
+    """Search hamsters by name (case-insensitive partial match)."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM hamsters WHERE LOWER(name) LIKE LOWER(?) ORDER BY name LIMIT ?",
+        (f"%{query}%", limit),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# ---- Followers ----
+
+def add_follower(hamster_id: str, email: str) -> dict | None:
+    """Add an email follower for a hamster. Returns the follower record or None if hamster not found."""
+    conn = get_db()
+    # Verify hamster exists
+    row = conn.execute("SELECT id FROM hamsters WHERE id = ?", (hamster_id,)).fetchone()
+    if not row:
+        conn.close()
+        return None
+    ts = now_iso()
+    try:
+        conn.execute(
+            "INSERT INTO followers (email, hamster_id, created_at) VALUES (?, ?, ?)",
+            (email, hamster_id, ts),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        # Already following — that's fine
+        return {"email": email, "hamster_id": hamster_id, "already_following": True}
+    conn.close()
+    return {"email": email, "hamster_id": hamster_id, "created_at": ts}
+
+
+def get_follower_count(hamster_id: str) -> int:
+    """Get the number of followers for a hamster."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT COUNT(*) as cnt FROM followers WHERE hamster_id = ?", (hamster_id,)
+    ).fetchone()
+    conn.close()
+    return row["cnt"]
+
+
+# ---- Hamster Activity Feed ----
+
+def get_hamster_activity(hamster_id: str, limit: int = 50) -> list[dict]:
+    """Get activity feed for a specific hamster."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM hamster_activity WHERE hamster_id = ? ORDER BY id DESC LIMIT ?",
+        (hamster_id, limit),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]

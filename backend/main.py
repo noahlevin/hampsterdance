@@ -89,6 +89,22 @@ async def api_list_hamsters(page: int = 0, per_page: int = 0, sort: str = "activ
     return JSONResponse(db.list_hamsters())
 
 
+@app.get("/api/hamsters/search")
+async def api_search_hamsters(q: str = ""):
+    if not q.strip():
+        return JSONResponse([])
+    results = db.search_hamsters(q.strip())
+    return JSONResponse(results)
+
+
+@app.get("/api/hamsters/by-name/{name:path}")
+async def api_get_hamster_by_name(name: str):
+    hamster = db.get_hamster_by_name(name)
+    if not hamster:
+        return JSONResponse({"error": "Hamster not found"}, status_code=404)
+    return JSONResponse(hamster)
+
+
 @app.get("/api/hamsters/{hamster_id}")
 async def api_get_hamster(hamster_id: str):
     hamster = db.get_hamster(hamster_id)
@@ -163,6 +179,33 @@ async def api_hamster_stats(hamster_id: str):
 async def api_notifications(hamster_id: str):
     notifications = db.get_notifications(hamster_id)
     return JSONResponse(notifications)
+
+
+@app.get("/api/hamsters/{hamster_id}/activity")
+async def api_hamster_activity(hamster_id: str, limit: int = 50):
+    hamster = db.get_hamster(hamster_id)
+    if not hamster:
+        return JSONResponse({"error": "Hamster not found"}, status_code=404)
+    activity = db.get_hamster_activity(hamster_id, min(limit, 200))
+    return JSONResponse(activity)
+
+
+@app.post("/api/hamsters/{hamster_id}/follow")
+async def api_follow_hamster(hamster_id: str, request: Request):
+    body = await request.json()
+    email = body.get("email", "").strip()
+    if not email or "@" not in email or "." not in email:
+        return JSONResponse({"error": "Valid email is required"}, status_code=400)
+    result = db.add_follower(hamster_id, email)
+    if result is None:
+        return JSONResponse({"error": "Hamster not found"}, status_code=404)
+    return JSONResponse(result, status_code=201)
+
+
+@app.get("/api/hamsters/{hamster_id}/followers/count")
+async def api_follower_count(hamster_id: str):
+    count = db.get_follower_count(hamster_id)
+    return JSONResponse({"count": count})
 
 
 @app.get("/api/activity")

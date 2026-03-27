@@ -13,13 +13,38 @@ const HAMSTER_GIFS = [
 let hamsters = {};
 let eventSource = null;
 let visitorCount = 0;
+let totalHamsterCount = 0;
+let currentBrowsePage = 1;
+const DANCE_FLOOR_MAX = 50;
 
 // ---- Music ----
 function startMusic() {
     const audio = document.getElementById('hamster-song');
+    const isMuted = localStorage.getItem('hampster-muted') === 'true';
     audio.volume = 0.4;
+    audio.muted = isMuted;
     audio.play().catch(() => {});
     document.getElementById('play-prompt').classList.add('hidden');
+    updateMuteButton();
+}
+
+function toggleMute() {
+    const audio = document.getElementById('hamster-song');
+    audio.muted = !audio.muted;
+    localStorage.setItem('hampster-muted', audio.muted ? 'true' : 'false');
+    updateMuteButton();
+}
+
+function updateMuteButton() {
+    const audio = document.getElementById('hamster-song');
+    const btn = document.getElementById('mute-btn');
+    if (audio.muted) {
+        btn.textContent = 'SOUND: OFF';
+        btn.classList.add('muted');
+    } else {
+        btn.textContent = 'SOUND: ON';
+        btn.classList.remove('muted');
+    }
 }
 
 // ---- Hamster Rendering ----
@@ -57,6 +82,12 @@ function renderHamster(hamster) {
     tile.appendChild(img);
     tile.appendChild(name);
 
+    // Click to open profile
+    tile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openProfile(hamster.id);
+    });
+
     if (hamster.status_message) {
         showBubble(tile, hamster.status_message);
     }
@@ -83,7 +114,16 @@ function renderAllHamsters() {
     floor.innerHTML = '';
 
     const hamsterList = Object.values(hamsters);
-    document.getElementById('hamster-count').textContent = hamsterList.length;
+    const dancingCount = Math.min(hamsterList.length, DANCE_FLOOR_MAX);
+
+    // Update counter bar
+    document.getElementById('hamster-count').textContent = dancingCount;
+    if (totalHamsterCount > DANCE_FLOOR_MAX) {
+        const totalLabel = document.getElementById('hamster-total-label');
+        const totalEl = document.getElementById('hamster-total');
+        totalLabel.style.display = 'inline';
+        totalEl.textContent = totalHamsterCount;
+    }
 
     if (hamsterList.length === 0) {
         floor.innerHTML = `
@@ -98,12 +138,31 @@ function renderAllHamsters() {
         return;
     }
 
-    // Sort by creation time
-    hamsterList.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    // Sort by most recently active for the dance floor
+    hamsterList.sort((a, b) => new Date(b.last_active) - new Date(a.last_active));
 
-    hamsterList.forEach(hamster => {
+    // Only show top DANCE_FLOOR_MAX on the floor
+    const displayList = hamsterList.slice(0, DANCE_FLOOR_MAX);
+
+    displayList.forEach(hamster => {
         floor.appendChild(renderHamster(hamster));
     });
+
+    // Show overflow message if needed
+    const overflowDiv = document.getElementById('dance-floor-overflow');
+    if (totalHamsterCount > DANCE_FLOOR_MAX) {
+        overflowDiv.style.display = 'block';
+        document.getElementById('showing-count').textContent = dancingCount;
+        document.getElementById('total-count-label').textContent = totalHamsterCount;
+    } else {
+        overflowDiv.style.display = 'none';
+    }
+
+    // Show browse section if there are hamsters
+    const browseSection = document.getElementById('browse-section');
+    if (totalHamsterCount > 0) {
+        browseSection.style.display = 'block';
+    }
 }
 
 // ---- Activity Feed ----
@@ -135,11 +194,23 @@ function escapeHtml(text) {
 // ---- API ----
 async function fetchHamsters() {
     try {
-        const res = await fetch(`${API_BASE}/api/hamsters`);
+        // Fetch active hamsters for the dance floor and total count in parallel
+        const [res, countRes] = await Promise.all([
+            fetch(`${API_BASE}/api/hamsters?page=1&per_page=${DANCE_FLOOR_MAX}&sort=active`),
+            fetch(`${API_BASE}/api/hamsters/count`)
+        ]);
         if (!res.ok) return;
         const data = await res.json();
         hamsters = {};
         data.forEach(h => { hamsters[h.id] = h; });
+
+        if (countRes.ok) {
+            const countData = await countRes.json();
+            totalHamsterCount = countData.count;
+        } else {
+            totalHamsterCount = data.length;
+        }
+
         renderAllHamsters();
     } catch (e) {
         console.error('Failed to fetch hamsters:', e);
@@ -168,8 +239,23 @@ async function recordVisit() {
         const data = await res.json();
         visitorCount = data.count;
         document.getElementById('visitor-count').textContent = visitorCount.toLocaleString();
+        renderHitCounter(visitorCount);
     } catch (e) {
         console.error('Failed to record visit:', e);
+    }
+}
+
+// ---- Hit Counter ----
+function renderHitCounter(count) {
+    const container = document.getElementById('hit-counter-digits');
+    if (!container) return;
+    const digits = String(count).padStart(6, '0');
+    container.innerHTML = '';
+    for (const d of digits) {
+        const span = document.createElement('span');
+        span.className = 'hit-digit';
+        span.textContent = d;
+        container.appendChild(span);
     }
 }
 
@@ -289,11 +375,365 @@ function copyCode(btn) {
     });
 }
 
+// ---- Browse All Hamsters ----
+async function loadBrowsePage(page) {
+    if (page < 1) return;
+    currentBrowsePage = page;
+
+    const sort = document.getElementById('browse-sort').value;
+    const perPage = 50;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/hamsters?page=${page}&per_page=${perPage}&sort=${sort}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const list = document.getElementById('browse-list');
+        list.innerHTML = '';
+
+        // Header row
+        const header = document.createElement('div');
+        header.className = 'browse-row browse-row-header';
+        header.innerHTML = `
+            <span class="browse-col-name">Name</span>
+            <span class="browse-col-creator">Creator</span>
+            <span class="browse-col-level">Lvl</span>
+            <span class="browse-col-style">Dance</span>
+            <span class="browse-col-active">Last Active</span>
+        `;
+        list.appendChild(header);
+
+        if (data.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'browse-empty';
+            empty.textContent = 'No hamsters found on this page.';
+            list.appendChild(empty);
+        } else {
+            data.forEach(h => {
+                const row = document.createElement('div');
+                row.className = 'browse-row';
+                row.style.cursor = 'pointer';
+
+                const lastActive = new Date(h.last_active);
+                const timeAgo = getTimeAgo(lastActive);
+
+                row.innerHTML = `
+                    <span class="browse-col-name">${escapeHtml(h.name)}</span>
+                    <span class="browse-col-creator">${escapeHtml(h.creator || '-')}</span>
+                    <span class="browse-col-level">${h.level || 1}</span>
+                    <span class="browse-col-style">${escapeHtml(h.dance_style || 'default')}</span>
+                    <span class="browse-col-active">${timeAgo}</span>
+                `;
+                row.addEventListener('click', () => openProfile(h.id));
+                list.appendChild(row);
+            });
+        }
+
+        // Update pagination controls
+        document.getElementById('browse-page-info').textContent = `Page ${page}`;
+        document.getElementById('browse-prev').disabled = (page <= 1);
+        document.getElementById('browse-next').disabled = (data.length < perPage);
+
+    } catch (e) {
+        console.error('Failed to load browse page:', e);
+    }
+}
+
+function getTimeAgo(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+}
+
+// ---- Search ----
+let searchTimeout = null;
+
+function initSearch() {
+    const input = document.getElementById('search-input');
+    const results = document.getElementById('search-results');
+
+    input.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        const q = input.value.trim();
+        if (!q) {
+            results.style.display = 'none';
+            clearSearchHighlights();
+            return;
+        }
+        searchTimeout = setTimeout(() => performSearch(q), 250);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            doSearch();
+        }
+        if (e.key === 'Escape') {
+            results.style.display = 'none';
+            clearSearchHighlights();
+        }
+    });
+
+    // Close results when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#search-bar')) {
+            results.style.display = 'none';
+        }
+    });
+}
+
+function doSearch() {
+    const q = document.getElementById('search-input').value.trim();
+    if (q) performSearch(q);
+}
+
+async function performSearch(query) {
+    const results = document.getElementById('search-results');
+    try {
+        const res = await fetch(`${API_BASE}/api/hamsters/search?q=${encodeURIComponent(query)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        clearSearchHighlights();
+
+        if (data.length === 0) {
+            results.innerHTML = '<div class="search-no-results">No hampsters found!</div>';
+            results.style.display = 'block';
+            return;
+        }
+
+        results.innerHTML = '';
+        data.forEach(h => {
+            const item = document.createElement('div');
+            item.className = 'search-result-item';
+
+            // Highlight on dance floor if visible
+            const tile = document.getElementById(`hamster-${h.id}`);
+            if (tile) {
+                tile.classList.add('search-highlight');
+            }
+
+            item.innerHTML = `
+                <img src="${getHamsterGif(h.id)}" alt="">
+                <span class="search-result-name">${escapeHtml(h.name)}</span>
+                <span class="search-result-creator">${h.creator ? 'by ' + escapeHtml(h.creator) : ''}</span>
+                <span class="search-result-style">${h.dance_style || 'default'}</span>
+            `;
+            item.addEventListener('click', () => {
+                results.style.display = 'none';
+                clearSearchHighlights();
+                openProfile(h.id);
+            });
+            results.appendChild(item);
+        });
+
+        results.style.display = 'block';
+    } catch (e) {
+        console.error('Search failed:', e);
+    }
+}
+
+function clearSearchHighlights() {
+    document.querySelectorAll('.search-highlight').forEach(el => {
+        el.classList.remove('search-highlight');
+    });
+}
+
+// ---- Hamster Profile ----
+let currentProfileId = null;
+
+async function openProfile(hamsterId) {
+    currentProfileId = hamsterId;
+    const overlay = document.getElementById('profile-overlay');
+    overlay.style.display = 'flex';
+
+    // Fetch hamster data, activity, and follower count in parallel
+    try {
+        const [hamsterRes, activityRes, followerRes] = await Promise.all([
+            fetch(`${API_BASE}/api/hamsters/${hamsterId}`),
+            fetch(`${API_BASE}/api/hamsters/${hamsterId}/activity?limit=50`),
+            fetch(`${API_BASE}/api/hamsters/${hamsterId}/followers/count`),
+        ]);
+
+        if (!hamsterRes.ok) {
+            closeProfile();
+            return;
+        }
+
+        const hamster = await hamsterRes.json();
+        const activity = activityRes.ok ? await activityRes.json() : [];
+        const followerData = followerRes.ok ? await followerRes.json() : { count: 0 };
+
+        renderProfile(hamster, activity, followerData.count);
+    } catch (e) {
+        console.error('Failed to load profile:', e);
+        closeProfile();
+    }
+}
+
+function renderProfile(hamster, activity, followerCount) {
+    // Title bar
+    document.getElementById('profile-title').textContent = hamster.name + ' - Hamster Profile';
+
+    // Header
+    document.getElementById('profile-gif').src = getHamsterGif(hamster.id);
+    document.getElementById('profile-name').textContent = hamster.name;
+    document.getElementById('profile-creator').textContent = hamster.creator ? 'Created by: ' + hamster.creator : '';
+    document.getElementById('profile-dance').textContent = 'Dance: ' + (hamster.dance_style || 'default');
+    document.getElementById('profile-accessory').textContent = hamster.accessory ? 'Accessory: ' + hamster.accessory : '';
+    document.getElementById('profile-level').textContent = 'Level: ' + (hamster.level || 1);
+
+    // Bio
+    const bioEl = document.getElementById('profile-bio');
+    if (hamster.bio) {
+        bioEl.textContent = hamster.bio;
+        bioEl.style.display = 'block';
+    } else {
+        bioEl.style.display = 'none';
+    }
+
+    // Stats
+    document.getElementById('stat-messages').textContent = hamster.total_messages || 0;
+    document.getElementById('stat-pokes-given').textContent = hamster.total_pokes_given || 0;
+    document.getElementById('stat-pokes-received').textContent = hamster.total_pokes_received || 0;
+    document.getElementById('stat-followers').textContent = followerCount;
+
+    // Time on floor
+    const created = new Date(hamster.created_at);
+    const now = new Date();
+    const diffMs = now - created;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffDays > 0) {
+        document.getElementById('stat-age').textContent = diffDays + 'd';
+    } else {
+        document.getElementById('stat-age').textContent = diffHours + 'h';
+    }
+
+    // Activity feed
+    const activityEl = document.getElementById('profile-activity');
+    if (activity.length === 0) {
+        activityEl.innerHTML = '<div class="activity-empty">No activity recorded yet.</div>';
+    } else {
+        activityEl.innerHTML = '';
+        activity.forEach(a => {
+            const entry = document.createElement('div');
+            entry.className = 'activity-entry';
+            const time = new Date(a.timestamp);
+            const timeStr = time.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const description = formatActivity(a);
+            entry.innerHTML = `<span class="activity-time">[${timeStr}]</span> ${escapeHtml(description)}`;
+            activityEl.appendChild(entry);
+        });
+    }
+
+    // Reset follow form
+    document.getElementById('follow-form').style.display = 'flex';
+    document.getElementById('follow-status').style.display = 'none';
+    document.getElementById('follow-status').style.color = '';
+    document.getElementById('follow-status').style.background = '';
+    document.getElementById('follow-status').style.borderColor = '';
+    document.getElementById('follow-email').value = '';
+}
+
+function formatActivity(activity) {
+    switch (activity.action_type) {
+        case 'joined':
+            return 'Joined the dance floor' + (activity.detail ? ' (' + activity.detail + ')' : '');
+        case 'said':
+            return 'Said: "' + (activity.detail || '') + '"';
+        case 'danced':
+            return 'Started doing the ' + (activity.detail || 'default');
+        case 'poked':
+            return 'Poked ' + (activity.detail || 'someone');
+        case 'was_poked':
+            return 'Got poked by ' + (activity.detail || 'someone');
+        case 'set_bio':
+            return 'Updated their bio';
+        default:
+            return activity.action_type + (activity.detail ? ': ' + activity.detail : '');
+    }
+}
+
+function closeProfile() {
+    document.getElementById('profile-overlay').style.display = 'none';
+    currentProfileId = null;
+}
+
+function closeProfileOverlay(event) {
+    if (event.target === event.currentTarget) {
+        closeProfile();
+    }
+}
+
+// ---- Follow ----
+async function followHamster() {
+    if (!currentProfileId) return;
+    const emailInput = document.getElementById('follow-email');
+    const email = emailInput.value.trim();
+
+    if (!email || !email.includes('@') || !email.includes('.')) {
+        emailInput.style.borderColor = '#CC0000';
+        setTimeout(() => { emailInput.style.borderColor = ''; }, 2000);
+        return;
+    }
+
+    const btn = document.getElementById('follow-btn');
+    btn.textContent = '...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/hamsters/${currentProfileId}/follow`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+
+        const status = document.getElementById('follow-status');
+        if (res.ok) {
+            document.getElementById('follow-form').style.display = 'none';
+            status.textContent = "You're following this hamster!";
+            status.style.color = '#009900';
+            status.style.background = '#F0FFF0';
+            status.style.borderColor = '#99CC99';
+            status.style.display = 'block';
+            // Update follower count
+            const countEl = document.getElementById('stat-followers');
+            countEl.textContent = parseInt(countEl.textContent) + 1;
+        } else {
+            const data = await res.json();
+            status.textContent = data.error || 'Something went wrong.';
+            status.style.color = '#CC0000';
+            status.style.background = '#FFF0F0';
+            status.style.borderColor = '#CC9999';
+            status.style.display = 'block';
+        }
+    } catch (e) {
+        console.error('Follow failed:', e);
+    } finally {
+        btn.textContent = 'Follow!';
+        btn.disabled = false;
+    }
+}
+
 // ---- Init ----
 async function init() {
+    // Restore mute state
+    updateMuteButton();
+
     await Promise.all([fetchHamsters(), fetchFeed(), recordVisit()]);
     connectSSE();
     initTabs();
+    initSearch();
+
+    // Load first page of browse section
+    loadBrowsePage(1);
 
     // Fallback polling in case SSE drops
     setInterval(fetchHamsters, 30000);

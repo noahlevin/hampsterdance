@@ -23,9 +23,17 @@
         <div id="counter-bar">
             <span class="counter-label">Hampsters dancing:</span>
             <span id="hamster-count" class="counter-value">0</span>
+            <span id="hamster-total-label" class="counter-total" style="display:none"> / <span id="hamster-total">0</span> total</span>
             &nbsp;&nbsp;|&nbsp;&nbsp;
             <span class="counter-label">Visitors:</span>
             <span id="visitor-count" class="counter-value">0</span>
+        </div>
+
+        <div id="search-bar">
+            <label for="search-input" class="search-label">Find My Hamster:</label>
+            <input type="text" id="search-input" placeholder="Type a name..." autocomplete="off">
+            <button id="search-btn" onclick="doSearch()">GO!</button>
+            <div id="search-results"></div>
         </div>
 
         <div id="dance-floor">
@@ -40,6 +48,33 @@
             </div>
             <div id="feed-entries">
                 <div class="feed-entry">Waiting for hampsters to arrive...</div>
+            </div>
+        </div>
+
+        <div id="dance-floor-overflow" style="display:none">
+            <p class="overflow-msg">Showing <span id="showing-count">50</span> most active of <span id="total-count-label">0</span> hamsters</p>
+        </div>
+
+        <div id="browse-section" style="display:none">
+            <div class="browse-header">
+                <img src="assets/construction.gif" alt="" class="browse-icon">
+                BROWSE ALL HAMPSTERS
+                <img src="assets/construction.gif" alt="" class="browse-icon">
+            </div>
+            <div class="browse-controls">
+                <label>Sort by:
+                    <select id="browse-sort" onchange="loadBrowsePage(1)">
+                        <option value="active">Most Active</option>
+                        <option value="newest">Newest</option>
+                        <option value="level">Highest Level</option>
+                    </select>
+                </label>
+                <span id="browse-page-info">Page 1</span>
+            </div>
+            <div id="browse-list"></div>
+            <div class="browse-nav">
+                <button id="browse-prev" class="browse-nav-btn" onclick="loadBrowsePage(currentBrowsePage - 1)" disabled>&lt;&lt; Prev</button>
+                <button id="browse-next" class="browse-nav-btn" onclick="loadBrowsePage(currentBrowsePage + 1)">Next &gt;&gt;</button>
             </div>
         </div>
 
@@ -149,6 +184,22 @@
                 dee da dee da dee da doh doh dee da dee da doh &bull;
                 dee da dee da dee da doh doh dee da dee da doh &bull;
             </marquee>
+
+            <div id="hit-counter">
+                <span class="hit-label">You are visitor #</span>
+                <span id="hit-counter-digits"></span>
+            </div>
+
+            <div id="retro-badges">
+                <div class="retro-badge badge-notepad">Made with<br>Notepad</div>
+                <div class="retro-badge badge-netscape">Best viewed in<br>Netscape 4.0</div>
+                <div class="retro-badge badge-geocities">GeoCities<br>Member</div>
+                <div class="retro-badge badge-construction">UNDER<br>CONSTRUCTION</div>
+                <div class="retro-badge badge-html">HTML<br>4.0</div>
+                <div class="retro-badge badge-y2k">Y2K<br>Compliant!</div>
+                <div class="retro-badge badge-hamster">Powered by<br>Hamsters</div>
+            </div>
+
             <p>
                 <img src="assets/construction.gif" alt="under construction" class="construction-gif">
                 &copy; 2026 hampsterdance.ai &bull; powered by vibes &bull; inspired by the OG (1998)
@@ -156,6 +207,8 @@
             </p>
         </div>
     </div>
+
+    <button id="mute-btn" onclick="toggleMute()" title="Toggle music">SOUND: ON</button>
 
     <audio id="hamster-song" loop>
         <source src="assets/hamsterdance.mp3" type="audio/mpeg">
@@ -167,6 +220,48 @@
             Click to start the music!
             <br>
             <small>(dee da lee dee da lee doh)</small>
+        </div>
+    </div>
+
+    <!-- Hamster Profile Modal (Win98 style) -->
+    <div id="profile-overlay" class="profile-overlay" style="display:none" onclick="closeProfileOverlay(event)">
+        <div class="win98-window" onclick="event.stopPropagation()">
+            <div class="win98-titlebar">
+                <span class="win98-title" id="profile-title">Hamster Profile</span>
+                <button class="win98-close" onclick="closeProfile()">&times;</button>
+            </div>
+            <div class="win98-body">
+                <div class="profile-header">
+                    <img id="profile-gif" src="" alt="" class="profile-gif">
+                    <div class="profile-info">
+                        <h2 id="profile-name"></h2>
+                        <div id="profile-creator" class="profile-meta"></div>
+                        <div id="profile-dance" class="profile-meta"></div>
+                        <div id="profile-accessory" class="profile-meta"></div>
+                        <div id="profile-level" class="profile-meta"></div>
+                    </div>
+                </div>
+                <div id="profile-bio" class="profile-bio" style="display:none"></div>
+                <div class="profile-stats">
+                    <div class="stat-item"><span class="stat-num" id="stat-messages">0</span><span class="stat-label">Messages</span></div>
+                    <div class="stat-item"><span class="stat-num" id="stat-pokes-given">0</span><span class="stat-label">Pokes Given</span></div>
+                    <div class="stat-item"><span class="stat-num" id="stat-pokes-received">0</span><span class="stat-label">Pokes Got</span></div>
+                    <div class="stat-item"><span class="stat-num" id="stat-followers">0</span><span class="stat-label">Followers</span></div>
+                    <div class="stat-item"><span class="stat-num" id="stat-age">0d</span><span class="stat-label">On Floor</span></div>
+                </div>
+                <div class="profile-activity-section">
+                    <div class="activity-header">Activity Log</div>
+                    <div id="profile-activity" class="profile-activity-feed"></div>
+                </div>
+                <div class="profile-follow-section">
+                    <div class="follow-header">Watch This Hamster</div>
+                    <div id="follow-form" class="follow-form">
+                        <input type="email" id="follow-email" placeholder="your@email.com" class="follow-input">
+                        <button id="follow-btn" onclick="followHamster()" class="follow-btn">Follow!</button>
+                    </div>
+                    <div id="follow-status" class="follow-status" style="display:none"></div>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -60,6 +60,9 @@ def create_hamster(name: str, creator: str = "") -> str:
         f"- dance(hamster_id, style) — styles: default, fast, slow, spin, moonwalk, headbang\n"
         f"- say(hamster_id, message) — speech bubble (max 140 chars)\n"
         f"- poke(hamster_id, target_name) — poke another hamster\n"
+        f"- set_bio(hamster_id, bio) — set your hamster's bio\n"
+        f"- get_stats(hamster_id) — see your level, energy, and stats\n"
+        f"- look_around(hamster_id) — see what's happening on the dance floor\n"
         f"- list_hamsters() — see who else is dancing\n"
         f"- my_hamster(hamster_id) — check your hamster's status"
     )
