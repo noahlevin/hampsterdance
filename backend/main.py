@@ -5,6 +5,7 @@ Serves the frontend, REST API, SSE events, and MCP server.
 
 import asyncio
 import json
+import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -14,9 +15,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 import database as db
 from mcp_server import mcp
+
+logger = logging.getLogger("hampsterdance")
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
@@ -71,6 +75,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class ActivityLoggingMiddleware(BaseHTTPMiddleware):
+    """Log all API POST/DELETE actions and MCP requests for analytics."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+
+        # Log API mutations
+        if path.startswith("/api/") and request.method in ("POST", "DELETE") and path != "/api/analytics":
+            try:
+                db.log_analytics(
+                    event_type=f"api:{request.method.lower()}",
+                    path=path,
+                    user_agent=request.headers.get("user-agent"),
+                    ip=request.client.host if request.client else None,
+                    metadata={"status_code": response.status_code},
+                )
+            except Exception:
+                pass  # never block requests for logging
+
+        # Log MCP requests
+        if path.startswith("/mcp") and request.method == "POST":
+            try:
+                db.log_analytics(
+                    event_type="mcp_request",
+                    path=path,
+                    user_agent=request.headers.get("user-agent"),
+                    ip=request.client.host if request.client else None,
+                )
+            except Exception:
+                pass
+
+        return response
+
+
+app.add_middleware(ActivityLoggingMiddleware)
 
 
 # ---- REST API ----
@@ -365,6 +407,36 @@ async def api_horoscope_sign(sign: str):
     if not horoscope:
         return JSONResponse({"error": "Horoscope not found for that sign"}, status_code=404)
     return JSONResponse(horoscope)
+
+
+# ---- Analytics API ----
+
+@app.post("/api/analytics")
+async def api_log_analytics(request: Request):
+    body = await request.json()
+    event_type = body.get("event", "").strip()
+    if not event_type:
+        return JSONResponse({"error": "event is required"}, status_code=400)
+    db.log_analytics(
+        event_type=event_type,
+        path=body.get("path"),
+        referrer=body.get("referrer"),
+        user_agent=request.headers.get("user-agent"),
+        ip=request.client.host if request.client else None,
+        session_id=body.get("session_id"),
+        metadata=body.get("metadata"),
+    )
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/analytics/summary")
+async def api_analytics_summary(days: int = 7):
+    return JSONResponse(db.get_analytics_summary(min(days, 90)))
+
+
+@app.get("/api/analytics/events")
+async def api_analytics_events(limit: int = 100, event_type: str | None = None):
+    return JSONResponse(db.get_analytics_events(min(limit, 500), event_type))
 
 
 # ---- SSE ----

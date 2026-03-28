@@ -1,5 +1,6 @@
 """Database setup and models for Hampster Dance AI."""
 
+import json
 import sqlite3
 import uuid
 import math
@@ -94,6 +95,22 @@ CREATE TABLE IF NOT EXISTS horoscopes (
     date TEXT NOT NULL,
     UNIQUE(sign, date)
 );
+
+CREATE TABLE IF NOT EXISTS page_analytics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    path TEXT,
+    referrer TEXT,
+    user_agent TEXT,
+    ip TEXT,
+    session_id TEXT,
+    metadata TEXT,
+    timestamp TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_event ON page_analytics(event_type);
+CREATE INDEX IF NOT EXISTS idx_analytics_ts ON page_analytics(timestamp);
+CREATE INDEX IF NOT EXISTS idx_analytics_session ON page_analytics(session_id);
 """
 
 # Migration: add new columns to existing hamsters table
@@ -924,3 +941,96 @@ def get_hamster_horoscope(hamster_id: str) -> dict | None:
         horoscope["hamster_name"] = hamster["name"]
         horoscope["hamster_id"] = hamster_id
     return horoscope
+
+
+# ---- Page Analytics ----
+
+def log_analytics(event_type: str, path: str | None = None, referrer: str | None = None,
+                  user_agent: str | None = None, ip: str | None = None,
+                  session_id: str | None = None, metadata: dict | None = None):
+    """Log a page analytics event."""
+    conn = get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    meta_json = json.dumps(metadata) if metadata else None
+    conn.execute(
+        """INSERT INTO page_analytics (event_type, path, referrer, user_agent, ip, session_id, metadata, timestamp)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (event_type, path, referrer, user_agent, ip, session_id, meta_json, now),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_analytics_summary(days: int = 7) -> dict:
+    """Get analytics summary for the last N days."""
+    conn = get_db()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    # Total events
+    total = conn.execute(
+        "SELECT COUNT(*) as c FROM page_analytics WHERE timestamp >= ?", (cutoff,)
+    ).fetchone()["c"]
+
+    # Events by type
+    by_type = conn.execute(
+        """SELECT event_type, COUNT(*) as c FROM page_analytics
+           WHERE timestamp >= ? GROUP BY event_type ORDER BY c DESC""",
+        (cutoff,),
+    ).fetchall()
+
+    # Unique sessions
+    sessions = conn.execute(
+        "SELECT COUNT(DISTINCT session_id) as c FROM page_analytics WHERE timestamp >= ? AND session_id IS NOT NULL",
+        (cutoff,),
+    ).fetchone()["c"]
+
+    # Top referrers
+    referrers = conn.execute(
+        """SELECT referrer, COUNT(*) as c FROM page_analytics
+           WHERE timestamp >= ? AND referrer IS NOT NULL AND referrer != ''
+           GROUP BY referrer ORDER BY c DESC LIMIT 20""",
+        (cutoff,),
+    ).fetchall()
+
+    # Daily breakdown
+    daily = conn.execute(
+        """SELECT DATE(timestamp) as day, COUNT(*) as c FROM page_analytics
+           WHERE timestamp >= ? GROUP BY DATE(timestamp) ORDER BY day""",
+        (cutoff,),
+    ).fetchall()
+
+    # Top pages
+    pages = conn.execute(
+        """SELECT path, COUNT(*) as c FROM page_analytics
+           WHERE timestamp >= ? AND path IS NOT NULL
+           GROUP BY path ORDER BY c DESC LIMIT 20""",
+        (cutoff,),
+    ).fetchall()
+
+    conn.close()
+    return {
+        "period_days": days,
+        "total_events": total,
+        "unique_sessions": sessions,
+        "events_by_type": [{"type": r["event_type"], "count": r["c"]} for r in by_type],
+        "top_referrers": [{"referrer": r["referrer"], "count": r["c"]} for r in referrers],
+        "daily_breakdown": [{"date": r["day"], "count": r["c"]} for r in daily],
+        "top_pages": [{"path": r["path"], "count": r["c"]} for r in pages],
+    }
+
+
+def get_analytics_events(limit: int = 100, event_type: str | None = None) -> list[dict]:
+    """Get recent analytics events, optionally filtered by type."""
+    conn = get_db()
+    if event_type:
+        rows = conn.execute(
+            "SELECT * FROM page_analytics WHERE event_type = ? ORDER BY timestamp DESC LIMIT ?",
+            (event_type, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM page_analytics ORDER BY timestamp DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

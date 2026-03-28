@@ -115,7 +115,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     z-index: 10;
-    animation: bubble-fade 8s forwards;
+    animation: bubble-fade 30s forwards;
 }
 
 .speech-bubble::after {
@@ -1467,6 +1467,21 @@ body {
 
     #dance-floor {
         min-height: 60vh;
+        padding: 8px;
+        gap: 2px;
+    }
+
+    .hamster-tile {
+        width: 95px;
+        padding: 3px;
+    }
+
+    .hamster-tile img {
+        width: 60px;
+    }
+
+    .hamster-tile .hamster-name {
+        font-size: 9px;
     }
 
     .title {

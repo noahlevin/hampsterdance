@@ -18,6 +18,24 @@ let hamsters = {};
 let eventSource = null;
 let visitorCount = 0;
 let totalHamsterCount = 0;
+
+// ---- Analytics ----
+const SESSION_ID = crypto.randomUUID();
+
+function trackEvent(event, metadata) {
+    const payload = {
+        event,
+        path: window.location.pathname,
+        referrer: document.referrer || null,
+        session_id: SESSION_ID,
+    };
+    if (metadata) payload.metadata = metadata;
+    fetch(`${API_BASE}/api/analytics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    }).catch(() => {}); // fire and forget
+}
 let currentBrowsePage = 1;
 const DANCE_FLOOR_MAX = 50;
 
@@ -168,7 +186,7 @@ function showBubble(tile, message) {
     tile.appendChild(bubble);
 
     // Remove after animation
-    setTimeout(() => bubble.remove(), 8000);
+    setTimeout(() => bubble.remove(), 30000);
 }
 
 function renderAllHamsters() {
@@ -442,6 +460,11 @@ function copyCode(btn) {
     const pre = codeBlock.querySelector('pre');
     const text = pre.textContent;
 
+    // Find which tab is active to know which platform
+    const activeTab = document.querySelector('.tab-btn.active');
+    const platform = activeTab ? activeTab.textContent.trim() : 'unknown';
+    trackEvent('copy_mcp_config', { platform });
+
     navigator.clipboard.writeText(text).then(() => {
         btn.textContent = 'Copied!';
         btn.classList.add('copied');
@@ -481,9 +504,12 @@ function toggleBrowse() {
     drawer.classList.toggle('open');
     overlay.classList.toggle('open');
 
-    // Load first page when opening for the first time
-    if (!isOpen && document.getElementById('browse-list').children.length === 0) {
-        loadBrowsePage(1);
+    if (!isOpen) {
+        trackEvent('open_browse');
+        // Load first page when opening for the first time
+        if (document.getElementById('browse-list').children.length === 0) {
+            loadBrowsePage(1);
+        }
     }
 }
 
@@ -578,7 +604,7 @@ function initSearch() {
             clearSearchHighlights();
             return;
         }
-        searchTimeout = setTimeout(() => performSearch(q), 250);
+        searchTimeout = setTimeout(() => { trackEvent('search', { query: q }); performSearch(q); }, 250);
     });
 
     input.addEventListener('keydown', (e) => {
@@ -659,9 +685,12 @@ function clearSearchHighlights() {
 
 // ---- Hamster Profile ----
 let currentProfileId = null;
+let profileOpenedAt = 0;
 
 async function openProfile(hamsterId) {
     currentProfileId = hamsterId;
+    profileOpenedAt = Date.now();
+    trackEvent('view_profile', { hamster_id: hamsterId });
     const overlay = document.getElementById('profile-overlay');
     overlay.style.display = 'flex';
 
@@ -828,7 +857,7 @@ function closeProfile() {
 }
 
 function closeProfileOverlay(event) {
-    if (event.target === event.currentTarget) {
+    if (event.target === event.currentTarget && Date.now() - profileOpenedAt > 300) {
         closeProfile();
     }
 }
@@ -1050,6 +1079,9 @@ async function init() {
     setInterval(fetchBattles, 30000);
     setInterval(fetchConga, 30000);
     setInterval(fetchSleepy, 60000);
+
+    // Track page view
+    trackEvent('page_view', { referrer: document.referrer });
 }
 
 // ---- Changelog Modal ----
